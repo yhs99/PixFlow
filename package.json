@@ -4,8 +4,8 @@
   "description": "소규모 이미지 갤러리 웹사이트",
   "main": "app.js",
   "scripts": {
-    "start": "cross-env NODE_ENV=production concurrently \"node bot/index.js\" \"node app.js",
-    "start:dev": "cross-env NODE_ENV=development concurrently \"node bot/index.js\" \"node app.js"
+    "start": "cross-env NODE_ENV=production concurrently \"node bot/index.js\" \"node app.js\"",
+    "start:dev": "cross-env NODE_ENV=development concurrently \"node bot/index.js\" \"node app.js\""
   },
   "dependencies": {
     "axios": "^1.8.4",
