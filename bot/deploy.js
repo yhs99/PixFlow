@@ -1,7 +1,7 @@
 const { REST, Routes } = require('discord.js');
 const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+const envPath = process.env.NODE_ENV === 'production' ? 'bot/.env.production' : 'bot/.env';
+require('dotenv').config({ path: envPath });
 
 const commands = [];
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));

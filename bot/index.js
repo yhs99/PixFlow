@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
-require('dotenv').config();
+const envPath = process.env.NODE_ENV === 'production' ? 'bot/.env.production' : 'bot/.env';
+require('dotenv').config({ path: envPath });
 const axios = require('axios');
 const FormData = require('form-data');
 const https = require('https');
@@ -17,15 +18,15 @@ const client = new Client({
 
 // 🔹 명령어 등록
 client.commands = new Collection();
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+const commandFiles = fs.readdirSync('./bot/commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
   client.commands.set(command.data.name, command);
 }
 
 // 🔹 봇 준비 완료
-client.on('ready', () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+  client.on('ready', () => {
+    console.log(`${process.env.NODE_ENV} 모드로 봇을 실행중입니다.`);
 });
 
 // 🔹 슬래시 명령어 처리

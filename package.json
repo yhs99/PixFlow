@@ -4,11 +4,12 @@
   "description": "소규모 이미지 갤러리 웹사이트",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js"
+    "start:prod": "cross-env NODE_ENV=production concurrently \"node bot/index.js\" \"node app.js",
+    "start:dev": "cross-env NODE_ENV=development concurrently \"node bot/index.js\" \"node app.js"
   },
   "dependencies": {
     "axios": "^1.8.4",
+    "concurrently": "^9.1.2",
     "discord.js": "^14.18.0",
     "dotenv": "^16.5.0",
     "ejs": "^3.1.9",
@@ -16,9 +17,11 @@
     "multer": "^1.4.5-lts.1",
     "nginx": "^1.1.0",
     "node-fetch": "^3.3.2",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "cross-env": "^7.0.3"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "nodemon": "^2.0.22"
   }
 }
