@@ -31,9 +31,10 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
+    const messageId = req.body.messageId;
     const timestamp = Date.now();
     const ext = path.extname(file.originalname);
-    cb(null, `${timestamp}${ext}`);
+    cb(null, `${messageId}_${timestamp}${ext}`);
   }
 });
 
@@ -104,7 +105,7 @@ app.post('/api/images', upload.array('images', 10), (req, res) => {
     return res.status(400).json({ error: '이미지 파일이 필요합니다.' });
   }
 
-  const { description, created_at, category } = req.body;
+  const { description, created_at, category, messageId } = req.body;
   const uploadedImages = [];
   let errorOccurred = false;
 
@@ -114,7 +115,7 @@ app.post('/api/images', upload.array('images', 10), (req, res) => {
 
     req.files.forEach(file => {
       const filename = file.filename;
-      
+      console.log(filename);
       db.run(
         'INSERT INTO images (filename, description, created_at, category) VALUES (?, ?, ?, ?)',
         [filename, description, created_at, category],
@@ -203,33 +204,56 @@ app.get('/api/images/:id', (req, res) => {
   });
 });
 
-// 이미지 삭제 API
-app.delete('/api/images/:id', (req, res) => {
-  const id = req.params.id;
+// 이미지 삭제 API (메시지 ID로)
+app.delete('/api/images/message/:messageId', (req, res) => {
+  const messageId = req.params.messageId;
   
-  db.get('SELECT filename FROM images WHERE id = ?', [id], (err, image) => {
+  db.all('SELECT id, filename FROM images WHERE filename LIKE ?', [`${messageId}_%`], (err, images) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: '이미지 조회 중 오류가 발생했습니다.' });
     }
     
-    if (!image) {
-      return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
+    if (images.length === 0) {
+      return res.status(404).json({ error: '해당 메시지의 이미지를 찾을 수 없습니다.' });
     }
-    
-    // 데이터베이스에서 삭제
-    db.run('DELETE FROM images WHERE id = ?', [id], (err) => {
-      if (err) {
-        console.error(err);
+
+    // 트랜잭션 시작
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+
+      let errorOccurred = false;
+      images.forEach(image => {
+        // 데이터베이스에서 삭제
+        db.run('DELETE FROM images WHERE id = ?', [image.id], (err) => {
+          if (err) {
+            console.error(err);
+            errorOccurred = true;
+            return;
+          }
+          
+          // 파일 시스템에서 삭제
+          const filePath = path.join('public/uploads', image.filename);
+          fs.unlink(filePath, (err) => {
+            if (err) {
+              console.error(err);
+              errorOccurred = true;
+            }
+          });
+        });
+      });
+
+      if (errorOccurred) {
+        db.run('ROLLBACK');
         return res.status(500).json({ error: '이미지 삭제 중 오류가 발생했습니다.' });
       }
-      
-      // 파일 시스템에서 삭제
-      const filePath = path.join('public/uploads', image.filename);
-      fs.unlink(filePath, (err) => {
+
+      db.run('COMMIT', (err) => {
         if (err) {
           console.error(err);
+          return res.status(500).json({ error: '이미지 삭제 중 오류가 발생했습니다.' });
         }
+        
         res.status(204).send();
       });
     });

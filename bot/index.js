@@ -81,6 +81,7 @@ client.on('messageCreate', async message => {
   }
 
   const form = new FormData();
+  const messageId = message.id;
   if(isNumber(year) && month === undefined) {
     const date = new Date();
     const month = (date.getMonth() + 1).toString().match(/\d{1,2}/)?.[0]?.padStart(2, '0');
@@ -91,10 +92,11 @@ client.on('messageCreate', async message => {
     form.append('category', '');
   }
   form.append('description', message.content || '');
+  form.append('messageId', messageId);
   const tempFiles = [];
     try {
         console.log('🕓 이미지 업로드 중입니다...')
-        const reply = await message.reply('🕓 이미지 업로드 중입니다...');
+        await message.react('🕓');
         // 이미지 각각 다운로드하고 form에 첨부
         for (let i = 0; i < images.length; i++) {
         const { url, name } = images[i];
@@ -116,18 +118,37 @@ client.on('messageCreate', async message => {
         const response = await axios.post(process.env.API_ENDPOINT, form, {
         headers: form.getHeaders()
         });
-
-        await reply.edit(`✅ ${response.data.message}`);
+        message.reactions.removeAll();
+        await message.react('✅');
         console.log('✅ 이미지 업로드 완료:', response.data.message);
     } catch (err) {
         console.error('❌ 이미지 업로드 실패:', err.message);
-        await reply.edit(`❌ 이미지 업로드에 실패했어요..`);
+        message.reactions.removeAll();
+        await message.react('❌');
     } finally {
         // 임시 파일 정리
         for (const file of tempFiles) {
         if (fs.existsSync(file)) fs.unlinkSync(file);
     }
 }
+});
+
+// 🔹 메시지 삭제 이벤트 처리
+client.on('messageDelete', async message => {
+  if (message.author.bot) return;
+  if (!message.attachments.size) return;
+  if (!message.channel.parent) return;
+
+  const parentId = message.channel.parentId;
+  const allowed = await isAllowedCommunity(parentId);
+  if (!allowed) return;
+
+  try {
+    await axios.delete(`${process.env.API_ENDPOINT}/message/${message.id}`);
+    console.log(`✅ 메시지 ${message.id}의 이미지가 성공적으로 삭제되었습니다.`);
+  } catch (err) {
+    console.error(`❌ 메시지 ${message.id}의 이미지 삭제 중 오류 발생:`, err.message);
+  }
 });
 
 function isNumber(str) {
