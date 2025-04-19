@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, ActivityType } = require('discord.js');
 const fs = require('fs');
 const envPath = process.env.NODE_ENV === 'production' ? 'bot/.env.production' : 'bot/.env';
 require('dotenv').config({ path: envPath });
@@ -26,6 +26,13 @@ for (const file of commandFiles) {
 
 // 🔹 봇 준비 완료
   client.on('ready', () => {
+    client.user.setPresence({
+      activities: [{
+        name: '별단.site',
+        type: ActivityType.Watching // 또는 Playing, Listening
+      }],
+      status: 'online', // 'idle', 'dnd', 'invisible' 가능
+    });
     console.log(`${process.env.NODE_ENV} 모드로 봇을 실행중입니다.`);
 });
 
