@@ -287,5 +287,38 @@ app.put('/api/images/:id/description', express.json(), (req, res) => {
   );
 });
 
+// 이미지 삭제 API (ID로)
+app.delete('/api/images/:id', (req, res) => {
+  const id = req.params.id;
+  
+  db.get('SELECT filename FROM images WHERE id = ?', [id], (err, image) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: '이미지 조회 중 오류가 발생했습니다.' });
+    }
+    
+    if (!image) {
+      return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
+    }
+    
+    // 데이터베이스에서 삭제
+    db.run('DELETE FROM images WHERE id = ?', [id], (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: '이미지 삭제 중 오류가 발생했습니다.' });
+      }
+      
+      // 파일 시스템에서 삭제
+      const filePath = path.join('public/uploads', image.filename);
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error(err);
+        }
+        res.status(204).send();
+      });
+    });
+  });
+});
+
 // 서버 시작
 app.listen(port, '0.0.0.0');
