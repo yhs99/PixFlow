@@ -7,7 +7,7 @@ const FormData = require('form-data');
 const https = require('https');
 const path = require('path');
 const { isAllowedCommunity } = require('./db');
-
+const { logImageUpload } = require('./logger');
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -71,7 +71,6 @@ client.on('messageCreate', async message => {
 
   const year = parentName.match(/\d{4}/)?.[0];
   const month = channelName.match(/\d{1,2}/)?.[0]?.padStart(2, '0');
-  console.log(parentName);
   if(year === undefined && parentId == '1361844061354459349') {
     year = 2025;
   }else if (year === undefined && parentId == '1361842728589070477') {
@@ -89,6 +88,7 @@ client.on('messageCreate', async message => {
 
   const form = new FormData();
   const messageId = message.id;
+  logImageUpload(message);
   if(isNumber(year) && month === undefined) {
     const date = new Date();
     const month = (date.getMonth() + 1).toString().match(/\d{1,2}/)?.[0]?.padStart(2, '0');
@@ -100,6 +100,9 @@ client.on('messageCreate', async message => {
   }
   form.append('description', message.content || '');
   form.append('messageId', messageId);
+  form.append('userId', message.author.id);
+  form.append('displayName', message.author.displayName);
+  form.append('avatar', message.author.displayAvatarURL({size: 32, dynamic: true}));
   const tempFiles = [];
     try {
         console.log('🕓 이미지 업로드 중입니다...')
@@ -126,8 +129,13 @@ client.on('messageCreate', async message => {
         headers: form.getHeaders()
         });
         message.reactions.removeAll();
-        await message.react('✅');
-        console.log('✅ 이미지 업로드 완료:', response.data.message);
+        if(response.status >= 200 && response.status < 300) {
+          await message.react('✅');
+          console.log('✅ 이미지 업로드 완료:', response.data.message);
+        }else {
+          await message.react('❌');
+          console.error('❌ 이미지 업로드 실패:', response.data.message);
+        }
     } catch (err) {
         console.error('❌ 이미지 업로드 실패:', err.message);
         message.reactions.removeAll();

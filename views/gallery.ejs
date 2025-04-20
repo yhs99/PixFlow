@@ -202,6 +202,8 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            aspect-ratio: 1;
+            cursor: pointer;
         }
 
         .image-item.with-animation {
@@ -245,6 +247,47 @@
 
         .image-item:hover .image-description {
             transform: translateY(0);
+        }
+
+        .uploader-info {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            padding: 4px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 12px;
+            backdrop-filter: blur(2px);
+            transition: all 0.3s ease;
+        }
+
+        .uploader-info.compact {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .uploader-info.compact .uploader-name {
+            display: none;
+        }
+
+        .uploader-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .uploader-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100px;
+            font-size: 0.7em;
         }
 
         .empty-message {
@@ -636,6 +679,33 @@
                 padding: 15px;
             }
         }
+
+        .slider-uploader-info {
+            position: relative;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            z-index: 1001;
+            margin-bottom: 15px;
+            align-self: center;
+        }
+
+        .slider-uploader-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .slider-uploader-name {
+            font-size: 0.9em;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -695,6 +765,10 @@
                                 <%= image.description %>
                             </div>
                         <% } %>
+                        <div class="uploader-info compact">
+                            <img src="<%= image.avatar %>" alt="업로더 아바타" class="uploader-avatar">
+                            <span class="uploader-name"><%= image.displayName || '알 수 없음' %></span>
+                        </div>
                     </div>
                 <% }); %>
             </div>
@@ -714,6 +788,10 @@
             </svg>
         </button>
         <div class="slider-content">
+            <div class="slider-uploader-info" style="display: none;">
+                <img src="" alt="업로더 아바타" class="slider-uploader-avatar">
+                <span class="slider-uploader-name"></span>
+            </div>
             <img src="" alt="" class="slider-image">
             <div class="description-container">
                 <p class="slider-description"></p>
@@ -746,7 +824,9 @@
             const imageData = {
                 id: item.dataset.id,
                 src: item.querySelector('img').src,
-                description: item.querySelector('.image-description')?.textContent?.trim() || ''
+                description: item.querySelector('.image-description')?.textContent?.trim() || '',
+                displayName: item.querySelector('.uploader-name')?.textContent || '알 수 없음',
+                avatar: item.querySelector('.uploader-avatar')?.src || ''
             };
             images.push(imageData);
 
@@ -754,7 +834,7 @@
             const imgElement = item.querySelector('img');
             imgElement.addEventListener('click', function() {
                 currentImageIndex = index;
-                openSlider(imageData.src, imageData.description, imageData.id);
+                openSlider(imageData);
             });
         });
 
@@ -777,10 +857,18 @@
         function updateSliderContent(image) {
             const sliderImage = document.querySelector('.slider-image');
             const descriptionElement = document.querySelector('.slider-description');
+            const uploaderInfo = document.querySelector('.slider-uploader-info');
+            const uploaderAvatar = uploaderInfo.querySelector('.slider-uploader-avatar');
+            const uploaderName = uploaderInfo.querySelector('.slider-uploader-name');
             
             sliderImage.src = image.src;
             descriptionElement.textContent = image.description || '설명이 없습니다.';
             currentImageId = image.id;
+
+            // 업로더 정보 표시
+            uploaderInfo.style.display = 'flex';
+            uploaderName.textContent = image.displayName;
+            uploaderAvatar.src = image.avatar;
 
             // 버튼 상태 업데이트
             document.querySelector('.slider-nav-prev').style.visibility = 
@@ -789,14 +877,23 @@
                 currentImageIndex === images.length - 1 ? 'hidden' : 'visible';
         }
 
-        function openSlider(imageUrl, description, imageId) {
-            currentImageId = imageId;
+        function openSlider(imageData) {
+            currentImageId = imageData.id;
             const slider = document.getElementById('imageSlider');
             const image = slider.querySelector('.slider-image');
             const descriptionElement = slider.querySelector('.slider-description');
+            const uploaderInfo = slider.querySelector('.slider-uploader-info');
+            const uploaderAvatar = uploaderInfo.querySelector('.slider-uploader-avatar');
+            const uploaderName = uploaderInfo.querySelector('.slider-uploader-name');
             
-            image.src = imageUrl;
-            descriptionElement.textContent = description || '설명이 없습니다.';
+            image.src = imageData.src;
+            descriptionElement.textContent = imageData.description || '설명이 없습니다.';
+            
+            // 업로더 정보 표시
+            uploaderInfo.style.display = 'flex';
+            uploaderName.textContent = imageData.displayName;
+            uploaderAvatar.src = imageData.avatar;
+            
             slider.style.display = 'flex';
             document.body.style.overflow = 'hidden';
             

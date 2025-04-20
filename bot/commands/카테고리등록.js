@@ -15,6 +15,12 @@ module.exports = {
 
   async execute(interaction) {
     console.log('카테고리등록 실행');
+    if(!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      return await interaction.reply({
+        content: '❌ 관리자 권한이 필요해요.',
+        ephemeral: true
+      });
+    }
     try {
       const category = interaction.options.getChannel('카테고리');
 
