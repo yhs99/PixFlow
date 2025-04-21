@@ -34,6 +34,7 @@ passport.use(new DiscordStrategy({
   scope: ['identify', 'guilds']
 }, (accessToken, refreshToken, profile, done) => {
   // 사용자 정보를 데이터베이스에 저장
+  console.log(profile);
   db.run(`
     INSERT INTO users (id, displayName, avatar, last_updated)
     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -41,7 +42,7 @@ passport.use(new DiscordStrategy({
       displayName = excluded.displayName,
       avatar = excluded.avatar,
       last_updated = CURRENT_TIMESTAMP
-  `, [profile.id, profile.username, `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`], (err) => {
+  `, [profile.id, profile.global_name, `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`], (err) => {
     if (err) {
       console.error('사용자 정보 저장 중 오류:', err);
       return done(err);

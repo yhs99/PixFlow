@@ -809,7 +809,7 @@
             <% if (user) { %>
                 <div class="user-info">
                     <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="프로필" class="user-avatar">
-                    <span class="user-name"><%= user.username %></span>
+                    <span class="user-name"><%= user.global_name %></span>
                     <a href="/auth/logout" class="logout-button">로그아웃</a>
                 </div>
             <% } else { %>
