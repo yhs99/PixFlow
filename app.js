@@ -4,12 +4,60 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { logRequest, logImageUpload, logImageDelete, logImageUpdate, logImageList } = require('./middleware/logger');
+const passport = require('passport');
+const DiscordStrategy = require('passport-discord').Strategy;
+const session = require('express-session');
+require('dotenv').config();
 
 const app = express();
 const port = 3000;
 
 // 데이터베이스 설정
 const db = new sqlite3.Database('gallery.db');
+
+// 세션 설정
+app.use(session({
+  secret: 'stargroups',
+  resave: false,
+  saveUninitialized: false
+}));
+
+// Passport 초기화
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Discord OAuth 설정
+passport.use(new DiscordStrategy({
+  clientID: process.env.DISCORD_CLIENT_ID,
+  clientSecret: process.env.DISCORD_CLIENT_SECRET,
+  callbackURL: process.env.DISCORD_CALLBACK_URL || 'http://localhost:3000/auth/discord/callback',
+  scope: ['identify', 'guilds']
+}, (accessToken, refreshToken, profile, done) => {
+  // 사용자 정보를 데이터베이스에 저장
+  db.run(`
+    INSERT INTO users (id, displayName, avatar, last_updated)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      displayName = excluded.displayName,
+      avatar = excluded.avatar,
+      last_updated = CURRENT_TIMESTAMP
+  `, [profile.id, profile.username, `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`], (err) => {
+    if (err) {
+      console.error('사용자 정보 저장 중 오류:', err);
+      return done(err);
+    }
+    return done(null, profile);
+  });
+}));
+
+// 세션 직렬화/역직렬화
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((obj, done) => {
+  done(null, obj);
+});
 
 // 데이터베이스 테이블 생성 (없는 경우에만)
 db.serialize(() => {
@@ -128,7 +176,8 @@ app.get('/', (req, res) => {
     res.render('gallery', { 
       groupedImages,
       months: Array.from(months).sort().reverse(),
-      selectedMonth
+      selectedMonth,
+      user: req.user
     });
   });
 });
@@ -395,6 +444,24 @@ app.delete('/api/images/:id', (req, res) => {
         res.status(204).send();
       });
     });
+  });
+});
+
+// Discord OAuth 라우트
+app.get('/auth/discord', passport.authenticate('discord'));
+
+app.get('/auth/discord/callback', 
+  passport.authenticate('discord', {
+    failureRedirect: '/'
+  }),
+  (req, res) => {
+    res.redirect('/');
+  }
+);
+
+app.get('/auth/logout', (req, res) => {
+  req.logout(() => {
+    res.redirect('/');
   });
 });
 
