@@ -33,21 +33,25 @@ passport.use(new DiscordStrategy({
   callbackURL: process.env.DISCORD_CALLBACK_URL || 'http://localhost:3000/auth/discord/callback',
   scope: ['identify', 'guilds']
 }, (accessToken, refreshToken, profile, done) => {
+  // 사용자의 길드 목록에서 특정 길드 멤버십 확인
+  const isGuildMember = profile.guilds?.some(guild => guild.id === '1194296331376803981');
+  
   // 사용자 정보를 데이터베이스에 저장
   console.log(profile);
   db.run(`
-    INSERT INTO users (id, displayName, avatar, last_updated)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO users (id, displayName, avatar, isGuildMember, last_updated)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
       displayName = excluded.displayName,
       avatar = excluded.avatar,
+      isGuildMember = excluded.isGuildMember,
       last_updated = CURRENT_TIMESTAMP
-  `, [profile.id, profile.global_name, `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`], (err) => {
+  `, [profile.id, profile.global_name, `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`, isGuildMember ? 1 : 0], (err) => {
     if (err) {
       console.error('사용자 정보 저장 중 오류:', err);
       return done(err);
     }
-    return done(null, profile);
+    return done(null, { ...profile, isGuildMember });
   });
 }));
 
@@ -89,7 +93,21 @@ db.serialize(() => {
     id TEXT PRIMARY KEY,
     displayName TEXT NOT NULL,
     avatar TEXT,
+    isGuildMember BOOLEAN DEFAULT 0,
     last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // 댓글 테이블 생성
+  db.run(`CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    imageId INTEGER NOT NULL,
+    userId TEXT NOT NULL,
+    content TEXT NOT NULL,
+    parentId INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (imageId) REFERENCES images(id) ON DELETE CASCADE,
+    FOREIGN KEY (userId) REFERENCES users(id),
+    FOREIGN KEY (parentId) REFERENCES comments(id) ON DELETE CASCADE
   )`);
 });
 
@@ -186,7 +204,7 @@ app.get('/', (req, res) => {
 // 이미지 업로드 API
 app.post('/api/images', upload.array('images', 10), (req, res) => {
   if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: '이미지 파일이 필요합니다.' });
+    return res.status(400).json({ error: '이미지 파일을 선택해주세요! 📸' });
   }
 
   const { description, created_at, category, messageId, userId, displayName, avatar } = req.body;
@@ -201,8 +219,8 @@ app.post('/api/images', upload.array('images', 10), (req, res) => {
 
     // 사용자 정보 업데이트 또는 삽입
     db.run(`
-      INSERT INTO users (id, displayName, avatar, last_updated)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO users (id, displayName, avatar, isGuildMember, last_updated)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
         displayName = excluded.displayName,
         avatar = excluded.avatar,
@@ -239,17 +257,17 @@ app.post('/api/images', upload.array('images', 10), (req, res) => {
 
     if (errorOccurred) {
       db.run('ROLLBACK');
-      return res.status(500).json({ error: '이미지 업로드 중 오류가 발생했습니다.' });
+      return res.status(500).json({ error: '이미지 업로드 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
     }
 
     db.run('COMMIT', (err) => {
       if (err) {
         console.error(err);
-        return res.status(500).json({ error: '이미지 업로드 중 오류가 발생했습니다.' });
+        return res.status(500).json({ error: '이미지 업로드 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
       }
       
       res.status(201).json({
-        message: `${uploadedImages.length}개의 이미지가 성공적으로 업로드되었습니다.`,
+        message: `${uploadedImages.length}개의 이미지가 업로드 되었어요! ✨`,
         images: uploadedImages
       });
     });
@@ -277,17 +295,16 @@ app.get('/api/images', (req, res) => {
   query += ' ORDER BY i.created_at DESC';
 
   db.all(query, params, (err, images) => {
-    console.log(images);
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: '이미지 목록 조회 중 오류가 발생했습니다.' });
+      return res.status(500).json({ error: '이미지 목록을 불러오는 중에 문제가 생겼어요. 새로고침 해주세요 🔄' });
     }
     
     const imagesWithUrl = images.map(image => ({
       ...image,
       url: `/uploads/${image.filename}`,
       displayName: image.displayName || '',
-      avatar: image.avatar || 'data:image/png;base64,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'
+      avatar: image.avatar || 'data:image/png;base64,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'
     }));
     
     logImageList(req, imagesWithUrl);
@@ -310,11 +327,11 @@ app.get('/api/images/:id', (req, res) => {
   `, [id], (err, image) => {
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: '이미지 조회 중 오류가 발생했습니다.' });
+      return res.status(500).json({ error: '이미지를 불러오는 중에 문제가 생겼어요. 새로고침 해주세요 🔄' });
     }
     
     if (!image) {
-      return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
+      return res.status(404).json({ error: '앗! 이미지를 찾을 수 없어요 😅' });
     }
     
     const imageWithUrl = {
@@ -336,11 +353,11 @@ app.delete('/api/images/message/:messageId', (req, res) => {
   db.all('SELECT id, filename FROM images WHERE filename LIKE ?', [`${messageId}_%`], (err, images) => {
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: '이미지 조회 중 오류가 발생했습니다.' });
+      return res.status(500).json({ error: '이미지를 찾는 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
     }
     
     if (images.length === 0) {
-      return res.status(404).json({ error: '해당 메시지의 이미지를 찾을 수 없습니다.' });
+      return res.status(404).json({ error: '앗! 해당 메시지의 이미지를 찾을 수 없어요 🤔' });
     }
 
     // 트랜잭션 시작
@@ -370,13 +387,13 @@ app.delete('/api/images/message/:messageId', (req, res) => {
 
       if (errorOccurred) {
         db.run('ROLLBACK');
-        return res.status(500).json({ error: '이미지 삭제 중 오류가 발생했습니다.' });
+        return res.status(500).json({ error: '이미지 삭제 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
       }
 
       db.run('COMMIT', (err) => {
         if (err) {
           console.error(err);
-          return res.status(500).json({ error: '이미지 삭제 중 오류가 발생했습니다.' });
+          return res.status(500).json({ error: '이미지 삭제 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
         }
         
         logImageDelete(req, { messageId, count: images.length });
@@ -392,7 +409,7 @@ app.put('/api/images/:id/description', express.json(), (req, res) => {
   const { description, password } = req.body;
 
   if (password !== 'star') {
-    return res.status(403).json({ error: '비밀번호가 올바르지 않습니다.' });
+    return res.status(403).json({ error: '비밀번호가 틀렸어요! 다시 확인해주세요 🔒' });
   }
 
   db.run(
@@ -401,15 +418,15 @@ app.put('/api/images/:id/description', express.json(), (req, res) => {
     function(err) {
       if (err) {
         console.error(err);
-        return res.status(500).json({ error: '설명 수정 중 오류가 발생했습니다.' });
+        return res.status(500).json({ error: '설명 수정 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
       }
 
       if (this.changes === 0) {
-        return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
+        return res.status(404).json({ error: '앗! 이미지를 찾을 수 없어요 😅' });
       }
 
       logImageUpdate(req, { id, description });
-      res.json({ message: '설명이 성공적으로 수정되었습니다.' });
+      res.json({ message: '설명이 수정되었어요! ✨' });
     }
   );
 });
@@ -421,18 +438,18 @@ app.delete('/api/images/:id', (req, res) => {
   db.get('SELECT filename FROM images WHERE id = ?', [id], (err, image) => {
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: '이미지 조회 중 오류가 발생했습니다.' });
+      return res.status(500).json({ error: '이미지를 찾는 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
     }
     
     if (!image) {
-      return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
+      return res.status(404).json({ error: '앗! 이미지를 찾을 수 없어요 😅' });
     }
     
     // 데이터베이스에서 삭제
     db.run('DELETE FROM images WHERE id = ?', [id], (err) => {
       if (err) {
         console.error(err);
-        return res.status(500).json({ error: '이미지 삭제 중 오류가 발생했습니다.' });
+        return res.status(500).json({ error: '이미지 삭제 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
       }
       
       // 파일 시스템에서 삭제
@@ -463,6 +480,141 @@ app.get('/auth/discord/callback',
 app.get('/auth/logout', (req, res) => {
   req.logout(() => {
     res.redirect('/');
+  });
+});
+
+// 길드 멤버 확인 함수
+async function isGuildMember(accessToken, userId) {
+  try {
+    console.log(`${accessToken} / ${userId} / ${process.env.DISCORD_BOT_TOKEN}`);
+    const response = await fetch(`https://discord.com/api/v10/guilds/1194296331376803981/members/${userId}`, {
+      headers: {
+        'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`
+      }
+    });
+
+    console.log(response);
+    if (response.ok) {
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('길드 멤버 확인 중 오류:', error);
+    return false;
+  }
+}
+
+// 댓글 작성 API
+app.post('/api/comments', express.json(), async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: '로그인해야 작성할 수 있어요. 로그인 후 다시 시도해주세요 🔒' });
+  }
+
+  // DB에서 길드 멤버 여부 확인
+  db.get('SELECT isGuildMember FROM users WHERE id = ?', [req.user.id], (err, user) => {
+    if (err) {
+      console.error('사용자 정보 조회 중 오류:', err);
+      return res.status(500).json({ error: '앗! 일시적인 오류가 발생했어요. 잠시 후에 다시 시도해주세요 😅' });
+    }
+
+    if (!user || !user.isGuildMember) {
+      return res.status(403).json({ error: '별단 멤버가 아니신가요? 별단 멤버만 작성 가능해요 ✨' });
+    }
+
+    const { imageId, content, parentId } = req.body;
+    
+    if (!imageId || !content) {
+      return res.status(400).json({ error: '댓글 내용이 없어요! 댓글 내용을 입력해주세요 📝' });
+    }
+
+    db.run(
+      'INSERT INTO comments (imageId, userId, content, parentId) VALUES (?, ?, ?, ?)',
+      [imageId, req.user.id, content, parentId || null],
+      function(err) {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ error: '댓글 작성 중 문제가 생겼어요. 잠시 후에 다시 시도해주세요 🙏' });
+        }
+
+        res.status(201).json({
+          id: this.lastID,
+          message: '댓글이 작성되었어요! 🎉'
+        });
+      }
+    );
+  });
+});
+
+// 댓글 목록 조회 API
+app.get('/api/comments/:imageId', (req, res) => {
+  const imageId = req.params.imageId;
+
+  db.all(`
+    SELECT 
+      c.*,
+      u.displayName,
+      u.avatar
+    FROM comments c
+    LEFT JOIN users u ON c.userId = u.id
+    WHERE c.imageId = ?
+    ORDER BY c.created_at ASC
+  `, [imageId], (err, comments) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: '댓글을 불러오는 중에 문제가 생겼어요. 새로고침 해주세요 🔄' });
+    }
+
+    // 댓글 계층 구조 생성
+    const commentMap = {};
+    const rootComments = [];
+
+    comments.forEach(comment => {
+      comment.replies = [];
+      commentMap[comment.id] = comment;
+
+      if (comment.parentId) {
+        if (commentMap[comment.parentId]) {
+          commentMap[comment.parentId].replies.push(comment);
+        }
+      } else {
+        rootComments.push(comment);
+      }
+    });
+
+    res.json(rootComments);
+  });
+});
+
+// 댓글 삭제 API
+app.delete('/api/comments/:id', (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: '로그인해야 삭제할 수 있어요 🔒' });
+  }
+
+  const commentId = req.params.id;
+
+  db.get('SELECT userId FROM comments WHERE id = ?', [commentId], (err, comment) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: '댓글 확인 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 😅' });
+    }
+
+    if (!comment) {
+      return res.status(404).json({ error: '앗! 이미 삭제된 댓글이에요 🤔' });
+    }
+
+    if (comment.userId !== req.user.id) {
+      return res.status(403).json({ error: '내가 작성한 댓글만 삭제할 수 있어요 ✋' });
+    }
+
+    db.run('DELETE FROM comments WHERE id = ?', [commentId], (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: '댓글 삭제 중에 문제가 생겼어요. 잠시 후에 다시 시도해주세요 🙏' });
+      }
+
+      res.status(204).send();
+    });
   });
 });
 

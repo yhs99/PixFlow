@@ -54,7 +54,7 @@
             padding: 1rem 2rem;
             background: rgba(10, 25, 47, 0.95);
             backdrop-filter: blur(10px);
-            z-index: 1000;
+            z-index: 999;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -62,6 +62,18 @@
             display: flex;
             align-items: center;
             gap: 1rem;
+        }
+
+        @media (min-width: 1025px) {
+            .header {
+                left: 240px; /* 사이드바 너비만큼 여백 */
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .logo {
+                margin-left: 40px;
+            }
         }
 
         .logo img {
@@ -133,7 +145,7 @@
             left: 0;
             top: 0;
             overflow-y: auto;
-            z-index: 100;
+            z-index: 1000;
             transition: transform 0.3s ease;
         }
 
@@ -274,12 +286,47 @@
             background: rgba(0, 0, 0, 0.7);
             color: white;
             transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             backdrop-filter: blur(5px);
+            opacity: 0;
         }
 
         .image-item:hover .image-description {
             transform: translateY(0);
+            opacity: 1;
+        }
+
+        .image-comment-count {
+            position: absolute;
+            top: 45px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 3px 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-size: 0.75em;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0;
+            z-index: 10;
+        }
+
+        .image-item:hover .image-comment-count {
+            opacity: 1;
+        }
+
+        .image-comment-count:hover {
+            background: rgba(88, 101, 242, 0.9);
+        }
+
+        .image-comment-count svg {
+            width: 12px;
+            height: 12px;
         }
 
         .uploader-info {
@@ -295,6 +342,7 @@
             border-radius: 12px;
             backdrop-filter: blur(2px);
             transition: all 0.3s ease;
+            z-index: 11;
         }
 
         .uploader-info.compact {
@@ -348,6 +396,9 @@
             opacity: 0;
             visibility: hidden;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 20px 0;
+            overflow-y: hidden;
+            overflow-x: hidden;
         }
 
         .slider-overlay.active {
@@ -355,21 +406,33 @@
             visibility: visible;
         }
 
+        .slider-overlay.active.with-comments-open {
+            overflow-y: auto;
+        }
+
+        .slider-content.with-comments {
+            max-width: 100%;
+        }
+
         .slider-content {
             position: relative;
             width: 90%;
-            max-width: 1200px;
+            max-width: 100%;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            align-items: flex-start;
             transform: scale(0.9);
             opacity: 0;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            gap: 20px;
+            padding: 0 40px;
+            justify-content: flex-end;
         }
 
-        .slider-overlay.active .slider-content {
-            transform: scale(1);
-            opacity: 1;
+        .slider-image-container {
+            width: calc(100% - 420px);
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(200px);
+            min-width: 0;
         }
 
         .slider-image {
@@ -378,6 +441,219 @@
             object-fit: contain;
             border-radius: 10px;
             box-shadow: 0 0 30px rgba(255, 192, 203, 0.3);
+            width: 100%;
+            height: auto;
+        }
+
+        .slider-content.with-comments .slider-image-container {
+            transform: translateX(0);
+        }
+
+        .comments-panel {
+            position: relative;
+            width: 400px;
+            max-width: 400px;
+            height: 80vh;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            overflow-y: auto;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            margin-left: 20px;
+            flex-shrink: 0;
+            transform: translateX(100%);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .comments-panel.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .comments-toggle {
+            position: static;
+            width: auto;
+            height: auto;
+            transform: none;
+            background: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .comment-count {
+            font-size: 0.7em;
+            margin-top: 2px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .slider-content.with-comments .comments-toggle {
+            color: #5865F2;
+        }
+
+        .slider-content.with-comments .comment-count {
+            color: #5865F2;
+        }
+
+        .comments-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .comments-count {
+            font-size: 1.1em;
+            font-weight: 500;
+            color: white;
+        }
+
+        .comments-close {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .comments-close:hover {
+            color: white;
+        }
+
+        .comments-list {
+            height: calc(100% - 120px);
+            overflow-y: auto;
+            padding: 20px;
+            margin-bottom: 120px;
+        }
+
+        .comment {
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .comment-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .comment-author {
+            font-weight: 500;
+            color: white;
+            font-size: 0.9em;
+        }
+
+        .comment-content {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.95em;
+            line-height: 1.4;
+            margin-left: 42px;
+            word-break: break-word;
+        }
+
+        .comment-actions {
+            margin-top: 8px;
+            margin-left: 42px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .comment-action {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85em;
+            cursor: pointer;
+            padding: 0;
+            transition: color 0.2s;
+        }
+
+        .comment-action:hover {
+            color: white;
+        }
+
+        .replies {
+            margin-left: 42px;
+            margin-top: 15px;
+            padding-left: 15px;
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .comment-form {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            height: 120px;
+        }
+
+        .comment-input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.9em;
+            resize: none;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .comment-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .comment-submit {
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: none;
+            background: #5865F2;
+            color: white;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .comment-submit:hover {
+            background: #4752C4;
+        }
+
+        .comment-submit:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slider-overlay.active .slider-content {
+            transform: scale(1);
+            opacity: 1;
         }
 
         .slider-close {
@@ -405,15 +681,18 @@
 
         .description-container {
             margin-top: 20px;
-            text-align: center;
-            color: white;
             position: relative;
             width: 100%;
-            max-width: 800px;
             transform: translateY(20px);
             opacity: 0;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             transition-delay: 0.2s;
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 10px;
+            padding: 15px 20px;
         }
 
         .slider-overlay.active .description-container {
@@ -422,35 +701,384 @@
         }
 
         .slider-description {
-            display: inline-block;
             margin: 0;
-            padding: 15px 20px;
-            background: rgba(0, 0, 0, 0.6);
-            border-radius: 10px;
-            max-width: 80%;
+            flex: 1;
             line-height: 1.5;
+            word-break: break-word;
         }
 
-        .edit-icon {
-            position: absolute;
-            right: 20px;
-            top: 20px;
+        .icon-container {
+            display: flex;
+            gap: 10px;
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        .edit-icon, .comments-toggle {
             background: none;
             border: none;
             color: rgba(255, 255, 255, 0.7);
             cursor: pointer;
             padding: 5px;
             transition: all 0.3s ease;
-            z-index: 2;
         }
 
-        .edit-icon:hover {
+        .edit-icon:hover, .comments-toggle:hover {
             color: white;
             transform: scale(1.1);
         }
 
-        .edit-form {
+        /* 모바일 메뉴 토글 버튼 */
+        .menu-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .menu-toggle {
+                display: flex;
+            }
+
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 1600px) {
+            .slider-content {
+                flex-direction: column;
+                align-items: center;
+                padding: 0 20px;
+                width: 100%;
+                max-width: 900px;
+                margin: 0 auto;
+            }
+
+            .slider-overlay {
+                align-items: flex-start;
+                padding-top: 80px;
+                padding-bottom: 40px;
+            }
+
+            .slider-overlay.active .slider-content {
+                margin-bottom: 40px;
+            }
+
+            .slider-image-container {
+                width: 100% !important;
+                transform: translateX(0) !important;
+                max-width: 900px;
+            }
+
+            .slider-image {
+                max-height: 60vh;
+                width: auto;
+                margin: 0 auto;
+                display: block;
+            }
+
+            .comments-panel {
+                width: 100%;
+                max-width: 900px;
+                height: auto;
+                max-height: 60vh;
+                margin-left: 0;
+                margin-top: 20px;
+                transform: translateY(50px);
+            }
+
+            .comments-panel.active {
+                transform: translateY(0);
+            }
+
+            .slider-content.with-comments .slider-image-container {
+                transform: translateX(0) !important;
+            }
+
+            .comments-list {
+                max-height: calc(60vh - 120px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 20px;
+            }
+
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 15px;
+            }
+
+            .month-header {
+                font-size: 1.5em;
+                margin-bottom: 20px;
+            }
+
+            .slider-content {
+                padding: 0 20px;
+            }
+
+            .slider-image {
+                max-height: 60vh;
+            }
+            
+            .logo {
+                margin-left: 50px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 10px;
+            }
+
+            .month-header {
+                font-size: 1.2em;
+            }
+
+            .delete-form {
+                width: 90%;
+                padding: 15px;
+            }
+            
+            .logo h1 {
+                font-size: 1.2rem;
+            }
+            
+            .logo {
+                margin-left: 45px;
+            }
+        }
+
+        .slider-uploader-info {
             position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            z-index: 1001;
+        }
+
+        .slider-uploader-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .slider-uploader-name {
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .auth-buttons {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .discord-login-button {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background-color: #5865F2;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .discord-login-button:hover {
+            background-color: #4752C4;
+        }
+
+        .discord-login-button img {
+            width: 20px;
+            height: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .logout-button {
+            padding: 0.25rem 0.5rem;
+            background-color: #dc3545;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            transition: background-color 0.2s;
+        }
+
+        .logout-button:hover {
+            background-color: #c82333;
+        }
+
+        .comments-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 10px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .comment-form {
+            margin-bottom: 20px;
+        }
+
+        .comment-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .comment-submit {
+            padding: 8px 16px;
+            background: #5865F2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .comment-submit:hover {
+            background: #4752C4;
+        }
+
+        .comment-submit:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        .comment {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .comment-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+
+        .comment-author {
+            font-weight: 500;
+            color: white;
+        }
+
+        .comment-content {
+            margin: 5px 0;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .comment-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .comment-action {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            font-size: 0.9em;
+            padding: 0;
+        }
+
+        .comment-action:hover {
+            color: white;
+        }
+
+        .reply-form {
+            margin-top: 10px;
+            margin-left: 20px;
+            display: none;
+        }
+
+        .reply-form.active {
+            display: block;
+        }
+
+        .replies {
+            margin-left: 20px;
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
+            padding-left: 10px;
+        }
+
+        .delete-comment {
+            color: #ff4444;
+        }
+
+        .edit-form {
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -519,48 +1147,6 @@
             transform: translateY(-2px);
         }
 
-        .slider-nav-button {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            font-size: 24px;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            z-index: 1002;
-        }
-
-        .slider-nav-button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-50%) scale(1.1);
-        }
-
-        .slider-nav-prev {
-            left: 20px;
-        }
-
-        .slider-nav-next {
-            right: 20px;
-        }
-
-        .slider-nav-button svg {
-            width: 24px;
-            height: 24px;
-            fill: none;
-            stroke: currentColor;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
         .delete-icon {
             position: absolute;
             top: 10px;
@@ -576,6 +1162,7 @@
             cursor: pointer;
             transition: all 0.2s;
             opacity: 0;
+            z-index: 10;
         }
 
         .image-item:hover .delete-icon {
@@ -585,217 +1172,6 @@
         .delete-icon:hover {
             background: rgba(255, 0, 0, 0.9);
             color: white;
-        }
-
-        .delete-form {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            display: none;
-        }
-
-        .delete-form.active {
-            display: block;
-        }
-
-        .delete-form input {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .delete-form .buttons {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .delete-form button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .delete-form .cancel {
-            background: #ddd;
-        }
-
-        .delete-form .confirm {
-            background: #ff4444;
-            color: white;
-        }
-
-        /* 모바일 메뉴 토글 버튼 */
-        .menu-toggle {
-            display: none;
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 101;
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* 반응형 디자인 */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-
-            .sidebar.active {
-                transform: translateX(0);
-            }
-
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-            }
-
-            .menu-toggle {
-                display: flex;
-            }
-
-            .image-grid {
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 20px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-                padding: 20px;
-            }
-
-            .image-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                gap: 15px;
-            }
-
-            .month-header {
-                font-size: 1.5em;
-                margin-bottom: 20px;
-            }
-
-            .slider-content {
-                width: 95%;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .image-grid {
-                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-                gap: 10px;
-            }
-
-            .month-header {
-                font-size: 1.2em;
-            }
-
-            .delete-form {
-                width: 90%;
-                padding: 15px;
-            }
-        }
-
-        .slider-uploader-info {
-            position: relative;
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border-radius: 20px;
-            backdrop-filter: blur(5px);
-            z-index: 1001;
-            margin-bottom: 15px;
-            align-self: center;
-        }
-
-        .slider-uploader-avatar {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .slider-uploader-name {
-            font-size: 0.9em;
-            font-weight: 500;
-        }
-
-        .auth-buttons {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .discord-login-button {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background-color: #5865F2;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .discord-login-button:hover {
-            background-color: #4752C4;
-        }
-
-        .discord-login-button img {
-            width: 20px;
-            height: 20px;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-        }
-
-        .user-name {
-            font-weight: 500;
-        }
-
-        .logout-button {
-            padding: 0.25rem 0.5rem;
-            background-color: #dc3545;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 0.875rem;
-            transition: background-color 0.2s;
-        }
-
-        .logout-button:hover {
-            background-color: #c82333;
         }
     </style>
 </head>
@@ -814,7 +1190,7 @@
                 </div>
             <% } else { %>
                 <a href="/auth/discord" class="discord-login-button">
-                    <img src="data:image/png;base64,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" alt="Discord">
+                    <img src="https://i.namu.wiki/i/kwY61GCWCLc2ri9cR_HIKspKdE2UznkEK65xENk3kOPnNkU1T4EbH25DbgkATrWwyKXhPETE8rVUMCjZRgdR6LPnPa1EecuFBvc6vivm9wQRg25EaaIG9vPAWKZi_DKf8mnVedjP1s7LEvQarC5sFQ.webp" alt="Discord">
                     Discord로 로그인
                 </a>
             <% } %>
@@ -828,7 +1204,6 @@
         </svg>
     </button>
     <div class="sidebar">
-        <h2>별단 추억갤러리</h2>
         <ul class="month-list">
             <% months.forEach(month => { %>
                 <li class="month-item <%= month === selectedMonth ? 'active' : '' %>"
@@ -871,6 +1246,12 @@
                                 <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
                             </svg>
                         </button>
+                        <div class="image-comment-count" data-id="<%= image.id %>">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            <span class="count">0</span>
+                        </div>
                         <% if (image.description) { %>
                             <div class="image-description">
                                 <%= image.description %>
@@ -898,26 +1279,56 @@
                 <path d="M9 18l6-6-6-6"/>
             </svg>
         </button>
+        <div class="slider-uploader-info">
+            <img src="" alt="업로더 아바타" class="slider-uploader-avatar">
+            <span class="slider-uploader-name"></span>
+        </div>
         <div class="slider-content">
-            <div class="slider-uploader-info" style="display: none;">
-                <img src="" alt="업로더 아바타" class="slider-uploader-avatar">
-                <span class="slider-uploader-name"></span>
-            </div>
-            <img src="" alt="" class="slider-image">
-            <div class="description-container">
-                <p class="slider-description"></p>
-                <button class="edit-icon" onclick="showEditForm()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                    </svg>
-                </button>
-                <div class="edit-form">
-                    <input type="password" id="edit-password" placeholder="비밀번호를 입력하세요">
-                    <textarea id="edit-description" placeholder="새로운 설명을 입력하세요"></textarea>
-                    <div class="edit-buttons">
-                        <button onclick="updateDescription()">저장</button>
-                        <button onclick="cancelEdit()">취소</button>
+            <div class="slider-image-container">
+                <img src="" alt="" class="slider-image">
+                <div class="description-container">
+                    <p class="slider-description"></p>
+                    <div class="icon-container">
+                        <button class="edit-icon" onclick="showEditForm()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                            </svg>
+                        </button>
+                        <button class="comments-toggle" onclick="toggleComments()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            <span class="comment-count">0</span>
+                        </button>
                     </div>
+                </div>
+            </div>
+
+            <div class="comments-panel">
+                <div class="comments-header">
+                    <span class="comments-count">댓글 0개</span>
+                    <button class="comments-close" onclick="toggleComments()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18"></path>
+                            <path d="M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="comments-list">
+                    <!-- 댓글이 여기에 동적으로 추가됩니다 -->
+                </div>
+                <div class="comment-form">
+                    <textarea class="comment-input" placeholder="댓글을 입력하세요..." rows="3"></textarea>
+                    <button class="comment-submit" onclick="submitComment()" disabled>댓글 작성</button>
+                </div>
+            </div>
+
+            <div class="edit-form">
+                <input type="password" id="edit-password" placeholder="비밀번호를 입력하세요">
+                <textarea id="edit-description" placeholder="새로운 설명을 입력하세요"></textarea>
+                <div class="edit-buttons">
+                    <button onclick="updateDescription()">저장</button>
+                    <button onclick="cancelEdit()">취소</button>
                 </div>
             </div>
         </div>
@@ -947,6 +1358,9 @@
                 currentImageIndex = index;
                 openSlider(imageData);
             });
+            
+            // 댓글 수 로드
+            loadImageCommentCount(item.dataset.id);
         });
 
         function showPrevImage() {
@@ -963,6 +1377,74 @@
                 const image = images[currentImageIndex];
                 updateSliderContent(image);
             }
+        }
+
+        function updateCommentCount(imageId) {
+            fetch(`/api/comments/${imageId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const commentCount = document.querySelector('.comment-count');
+                    let totalComments = 0;
+                    
+                    function countComments(comments) {
+                        comments.forEach(comment => {
+                            totalComments++;
+                            if (comment.replies) {
+                                countComments(comment.replies);
+                            }
+                        });
+                    }
+                    
+                    countComments(data);
+                    commentCount.textContent = totalComments;
+                })
+                .catch(error => {
+                    console.error('댓글 수 로딩 중 오류:', error);
+                });
+        }
+
+        function openSlider(imageData) {
+            currentImageId = imageData.id;
+            const slider = document.getElementById('imageSlider');
+            const image = slider.querySelector('.slider-image');
+            const descriptionElement = slider.querySelector('.slider-description');
+            const uploaderInfo = slider.querySelector('.slider-uploader-info');
+            const uploaderAvatar = uploaderInfo.querySelector('.slider-uploader-avatar');
+            const uploaderName = uploaderInfo.querySelector('.slider-uploader-name');
+            
+            // 댓글 패널 초기화
+            const sliderContent = slider.querySelector('.slider-content');
+            const commentsPanel = slider.querySelector('.comments-panel');
+            sliderContent.classList.remove('with-comments');
+            commentsPanel.classList.remove('active');
+            slider.classList.remove('with-comments-open');
+            
+            // 이미지와 설명 업데이트
+            image.src = imageData.src;
+            descriptionElement.textContent = imageData.description || '설명이 없습니다.';
+            
+            // 업로더 정보 표시
+            uploaderInfo.style.display = 'flex';
+            uploaderName.textContent = imageData.displayName;
+            uploaderAvatar.src = imageData.avatar;
+            
+            // 슬라이더 표시
+            slider.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            // 버튼 상태 업데이트
+            document.querySelector('.slider-nav-prev').style.visibility = 
+                currentImageIndex === 0 ? 'hidden' : 'visible';
+            document.querySelector('.slider-nav-next').style.visibility = 
+                currentImageIndex === images.length - 1 ? 'hidden' : 'visible';
+            
+            // 애니메이션 적용
+            requestAnimationFrame(() => {
+                slider.classList.add('active');
+            });
+            
+            // 댓글 수 업데이트
+            updateCommentCount(currentImageId);
         }
 
         function updateSliderContent(image) {
@@ -986,37 +1468,9 @@
                 currentImageIndex === 0 ? 'hidden' : 'visible';
             document.querySelector('.slider-nav-next').style.visibility = 
                 currentImageIndex === images.length - 1 ? 'hidden' : 'visible';
-        }
-
-        function openSlider(imageData) {
-            currentImageId = imageData.id;
-            const slider = document.getElementById('imageSlider');
-            const image = slider.querySelector('.slider-image');
-            const descriptionElement = slider.querySelector('.slider-description');
-            const uploaderInfo = slider.querySelector('.slider-uploader-info');
-            const uploaderAvatar = uploaderInfo.querySelector('.slider-uploader-avatar');
-            const uploaderName = uploaderInfo.querySelector('.slider-uploader-name');
-            
-            image.src = imageData.src;
-            descriptionElement.textContent = imageData.description || '설명이 없습니다.';
-            
-            // 업로더 정보 표시
-            uploaderInfo.style.display = 'flex';
-            uploaderName.textContent = imageData.displayName;
-            uploaderAvatar.src = imageData.avatar;
-            
-            slider.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-            
-            // 버튼 상태 업데이트
-            document.querySelector('.slider-nav-prev').style.visibility = 
-                currentImageIndex === 0 ? 'hidden' : 'visible';
-            document.querySelector('.slider-nav-next').style.visibility = 
-                currentImageIndex === images.length - 1 ? 'hidden' : 'visible';
-
-            requestAnimationFrame(() => {
-                slider.classList.add('active');
-            });
+                
+            // 댓글 수 업데이트
+            updateCommentCount(currentImageId);
         }
 
         function closeSlider() {
@@ -1193,6 +1647,206 @@
                 sidebar.classList.remove('active');
             }
         });
+
+        function toggleComments() {
+            const sliderContent = document.querySelector('.slider-content');
+            const commentsPanel = document.querySelector('.comments-panel');
+            const sliderOverlay = document.getElementById('imageSlider');
+            
+            sliderContent.classList.toggle('with-comments');
+            commentsPanel.classList.toggle('active');
+            sliderOverlay.classList.toggle('with-comments-open');
+
+            // 댓글창이 닫힐 때 스크롤 초기화
+            if (!commentsPanel.classList.contains('active')) {
+                setTimeout(() => {
+                    sliderOverlay.scrollLeft = 0;
+                }, 300);
+            }
+
+            if (commentsPanel.classList.contains('active')) {
+                loadComments(currentImageId);
+            }
+        }
+
+        function loadComments(imageId) {
+            fetch(`/api/comments/${imageId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const commentsList = document.querySelector('.comments-list');
+                    const commentsCount = document.querySelector('.comments-count');
+                    const commentCount = document.querySelector('.comment-count');
+                    commentsList.innerHTML = '';
+                    
+                    let totalComments = 0;
+                    function countComments(comments) {
+                        comments.forEach(comment => {
+                            totalComments++;
+                            if (comment.replies) {
+                                countComments(comment.replies);
+                            }
+                        });
+                    }
+                    countComments(data);
+                    commentsCount.textContent = `댓글 ${totalComments}개`;
+                    commentCount.textContent = totalComments;
+
+                    function renderComment(comment, isReply = false) {
+                        const div = document.createElement('div');
+                        div.className = `comment ${isReply ? 'reply' : ''}`;
+                        div.innerHTML = `
+                            <div class="comment-header">
+                                <img src="${comment.avatar}" alt="프로필" class="comment-avatar">
+                                <span class="comment-author">${comment.displayName}</span>
+                            </div>
+                            <div class="comment-content">${comment.content}</div>
+                            <div class="comment-actions">
+                                <button class="comment-action" onclick="showReplyForm(${comment.id})">답글</button>
+                                ${comment.userId === '<%= user?.id %>' ? 
+                                    `<button class="comment-action" onclick="deleteComment(${comment.id})">삭제</button>` : 
+                                    ''}
+                            </div>
+                            <div class="reply-form" id="reply-form-${comment.id}">
+                                <textarea class="comment-input" placeholder="답글을 입력하세요..."></textarea>
+                                <button class="comment-submit" onclick="submitReply(${comment.id})">답글 작성</button>
+                            </div>
+                            ${comment.replies?.length ? '<div class="replies">' + 
+                                comment.replies.map(reply => renderComment(reply, true)).join('') + 
+                                '</div>' : ''}
+                        `;
+                        return div.outerHTML;
+                    }
+
+                    data.forEach(comment => {
+                        commentsList.innerHTML += renderComment(comment);
+                    });
+                })
+                .catch(error => {
+                    console.error('댓글 로딩 중 오류:', error);
+                });
+        }
+
+        function submitComment() {
+            const input = document.querySelector('.comment-form .comment-input');
+            const content = input.value.trim();
+            if (!content) return;
+
+            fetch('/api/comments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    imageId: currentImageId,
+                    content: content
+                })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error);
+                }
+                input.value = '';
+                loadComments(currentImageId);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(error.message);
+            });
+        }
+
+        function showReplyForm(commentId) {
+            const form = document.getElementById(`reply-form-${commentId}`);
+            form.style.display = form.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function submitReply(commentId) {
+            const form = document.getElementById(`reply-form-${commentId}`);
+            const input = form.querySelector('.comment-input');
+            const content = input.value.trim();
+            if (!content) return;
+
+            fetch('/api/comments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    imageId: currentImageId,
+                    content: content,
+                    parentId: commentId
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('답글 작성 중 오류가 발생했습니다.');
+                }
+                input.value = '';
+                form.style.display = 'none';
+                loadComments(currentImageId);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(error.message);
+            });
+        }
+
+        function deleteComment(commentId) {
+            if (!confirm('댓글을 삭제하시겠습니까?')) return;
+
+            fetch(`/api/comments/${commentId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('댓글 삭제 중 오류가 발생했습니다.');
+                }
+                loadComments(currentImageId);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(error.message);
+            });
+        }
+
+        // 댓글 입력 필드 이벤트 리스너
+        document.querySelector('.comment-form .comment-input').addEventListener('input', function() {
+            document.querySelector('.comment-form .comment-submit').disabled = !this.value.trim();
+        });
+
+        // 이미지 리스트의 댓글 수 로드 함수
+        function loadImageCommentCount(imageId) {
+            fetch(`/api/comments/${imageId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const commentCountElement = document.querySelector(`.image-comment-count[data-id="${imageId}"] .count`);
+                    if (!commentCountElement) return;
+                    
+                    let totalComments = 0;
+                    function countComments(comments) {
+                        comments.forEach(comment => {
+                            totalComments++;
+                            if (comment.replies) {
+                                countComments(comment.replies);
+                            }
+                        });
+                    }
+                    
+                    countComments(data);
+                    commentCountElement.textContent = totalComments;
+                    
+                    // 댓글이 없으면 숨김
+                    const commentIcon = document.querySelector(`.image-comment-count[data-id="${imageId}"]`);
+                    if (totalComments === 0) {
+                        commentIcon.style.opacity = '0';
+                    } else {
+                        commentIcon.style.opacity = '1';
+                    }
+                })
+                .catch(error => {
+                    console.error('댓글 수 로딩 중 오류:', error);
+                });
+        }
     </script>
 </body>
 </html> 
