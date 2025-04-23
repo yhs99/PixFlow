@@ -13,8 +13,23 @@ const app = express();
 const port = 3000;
 
 // 데이터베이스 설정
-const db = new sqlite3.Database('gallery.db');
-
+const db = new sqlite3.Database('gallery.db', (err) => {
+  if(err) {
+    console.error('데이터베이스 연결 중 오류:', err);
+  } else {
+    console.log('데이터베이스 연결 성공');
+  }
+});
+   // 프로세스 종료 시 데이터베이스 연결 닫기
+process.on('exit', () => {
+    db.close((err) => {
+      if (err) {
+        console.error('데이터베이스 닫기 오류:', err.message);
+      } else {
+        console.log('데이터베이스 연결이 안전하게 닫혔습니다.');
+      }
+    });
+  });
 // 세션 설정
 app.use(session({
   secret: 'stargroups',

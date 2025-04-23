@@ -1,6 +1,9 @@
 services:
   app:
     build: .
+    volumes:
+      - /opt/star/production/gallery.db:/app/gallery.db
+      - /opt/star/production/public/uploads:/app/public/uploads
     ports:
       - "3000:3000"
     working_dir: /app

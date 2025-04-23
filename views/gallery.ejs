@@ -88,7 +88,7 @@
         }
 
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: 'SANS-KR', sans-serif;
             background-color: #0a192f;
             background-image: 
                 radial-gradient(1px 1px at 10% 10%, white 1px, transparent 0),
@@ -1173,6 +1173,170 @@
             background: rgba(255, 0, 0, 0.9);
             color: white;
         }
+
+        .delete-form {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(10, 25, 47, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 300px;
+            max-width: 90%;
+        }
+
+        .delete-form.active {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        .delete-form h3 {
+            color: white;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        .delete-form p {
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .delete-form input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .delete-form input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .delete-form .buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .delete-form button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .delete-form button.cancel {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .delete-form button.cancel:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .delete-form button.confirm {
+            background: rgba(255, 59, 48, 0.9);
+            border: none;
+            color: white;
+        }
+
+        .delete-form button.confirm:hover {
+            background: rgba(255, 59, 48, 1);
+            transform: translateY(-1px);
+        }
+
+        .delete-form-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .delete-form-overlay.active {
+            opacity: 1;
+        }
+
+        .slider-nav-button {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 1001;
+        }
+
+        .slider-nav-button:hover {
+            background: rgba(0, 0, 0, 0.8);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .slider-nav-prev {
+            left: 20px;
+        }
+
+        .slider-nav-next {
+            right: 20px;
+        }
+
+        .slider-nav-button svg {
+            width: 24px;
+            height: 24px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        @media (max-width: 768px) {
+            .slider-nav-button {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+
+            .slider-nav-prev {
+                left: 10px;
+            }
+
+            .slider-nav-next {
+                right: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1471,6 +1635,12 @@
                 
             // 댓글 수 업데이트
             updateCommentCount(currentImageId);
+            
+            // 댓글 패널이 열려있으면 댓글 목록도 갱신
+            const commentsPanel = document.querySelector('.comments-panel');
+            if (commentsPanel.classList.contains('active')) {
+                loadComments(currentImageId);
+            }
         }
 
         function closeSlider() {
@@ -1577,6 +1747,12 @@
             const imageItem = button.closest('.image-item');
             currentImageId = imageItem.dataset.id;
             
+            // 오버레이 생성
+            const overlay = document.createElement('div');
+            overlay.className = 'delete-form-overlay';
+            document.body.appendChild(overlay);
+            
+            // 모달 폼 생성
             const form = document.createElement('div');
             form.className = 'delete-form';
             form.innerHTML = `
@@ -1590,13 +1766,27 @@
             `;
             
             document.body.appendChild(form);
-            form.classList.add('active');
+            
+            // 애니메이션을 위해 약간의 지연 후 active 클래스 추가
+            setTimeout(() => {
+                overlay.classList.add('active');
+                form.classList.add('active');
+            }, 10);
         }
 
         function cancelDelete() {
             const form = document.querySelector('.delete-form');
+            const overlay = document.querySelector('.delete-form-overlay');
+            
             if (form) {
-                form.remove();
+                form.classList.remove('active');
+                overlay.classList.remove('active');
+                
+                // 애니메이션이 끝난 후 요소 제거
+                setTimeout(() => {
+                    form.remove();
+                    overlay.remove();
+                }, 300);
             }
         }
 
