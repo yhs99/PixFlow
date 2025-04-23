@@ -28,14 +28,15 @@ const logRequest = (req, res, next) => {
       case 'DELETE': methodColor = chalk.red; break;
       default: methodColor = chalk.white;
     }
-
-    console.log(
-      `${chalk.gray(timestamp)} | ` +
-      `${methodColor(method.padEnd(7))} | ` +
-      `${statusColor(status.toString().padStart(3))} | ` +
-      `${chalk.white(url)} | ` +
-      `${chalk.magenta(`${duration}ms`)} | `
-    );
+    if(!(method === 'GET' && url.includes('/api/comments/'))){
+      console.log(
+        `${chalk.gray(timestamp)} | ` +
+        `${methodColor(method.padEnd(7))} | ` +
+        `${statusColor(status.toString().padStart(3))} | ` +
+        `${chalk.white(url)} | ` +
+        `${chalk.magenta(`${duration}ms`)} | `
+      );
+    }
   });
 
   next();
