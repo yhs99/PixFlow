@@ -18,3 +18,5 @@ public/uploads/*
 /bot/nohup.out
 /bot/logs/*
 gallery.db
+gallery.db-shm
+gallery.db-wal
