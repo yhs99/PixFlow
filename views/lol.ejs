@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>롤 랜덤 챔피언 뽑기</title>
+  <style>
+    .container { max-width: 800px; margin: 20px auto; padding: 20px; }
+    .room-form { margin-bottom: 20px; }
+    .teams-container { display: flex; justify-content: space-between; margin: 20px 0; }
+    .team { width: 48%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    .waiting-room { 
+      width: 100%; 
+      padding: 10px; 
+      border: 1px solid #ccc; 
+      border-radius: 5px; 
+      margin: 20px 0;
+      background: #f8f8f8;
+    }
+    .waiting-room h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    .seat { 
+      width: 100%; height: 80px; margin: 5px 0;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      background: #f0f0f0; cursor: pointer; user-select: none;
+      border-radius: 5px;
+      position: relative;
+    }
+    .seat.taken { background: #d0d0d0; cursor: not-allowed; }
+    .seat.team1 { border: 2px solid #ff0000; }
+    .seat.team2 { border: 2px solid #0000ff; }
+    .seat.waiting { border: 2px solid #cccccc; }
+    .seat .select-btn {
+      position: absolute;
+      bottom: 5px;
+      padding: 2px 8px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      display: none;
+    }
+    .seat:not(.taken):hover .select-btn {
+      display: block;
+    }
+    .seat .player-info {
+      text-align: center;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: space-between;
+    }
+    .seat .player-name {
+      font-weight: bold;
+    }
+    .seat .player-name.self {
+      color: #4CAF50; /* 초록색 */
+    }
+    .seat .player-name.host {
+      color: #ff0000; /* 빨간색 */
+    }
+    .seat .champion-display { 
+      font-weight: bold; 
+      color: #333;
+      margin: 5px 0;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .seat .champion-display img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .seat .champion-display.unknown {
+      background-color: #ccc;
+      color: #666;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .seat .reroll-count { 
+      color: #666; 
+      font-size: 0.8em;
+      margin-top: 5px;
+    }
+    .seat .reroll-btn {
+      margin-top: auto;
+      padding: 2px 8px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .seat .reroll-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .controls {
+      margin: 20px 0;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    .controls button { 
+      margin: 0 10px; 
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .controls button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+    #rerollBtn {
+      background-color: #2196F3;
+      color: white;
+      border: none;
+    }
+    #rerollBtn:not(:disabled):hover {
+      background-color: #1976D2;
+    }
+    .reroll-count-display {
+      color: #666;
+      font-size: 14px;
+      margin-left: 5px;
+    }
+    #team1Seats, #team2Seats, #waitingSeats {
+      display: flex;
+      flex-direction: column;
+      padding: 5px;
+    }
+    #waitingSeats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 5px;
+      padding: 5px;
+    }
+    .seat.waiting {
+      border: 2px solid #cccccc;
+      background: #fff;
+      height: 60px;
+    }
+    .seat.waiting .player-info {
+      font-size: 11px;
+    }
+    .seat.waiting .champion-display {
+      font-size: 11px;
+      margin: 2px 0;
+    }
+    .seat.waiting .reroll-count {
+      font-size: 10px;
+    }
+    .seat.waiting .reroll-btn {
+      padding: 1px 6px;
+      font-size: 11px;
+    }
+    .room-list {
+      margin: 20px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 10px;
+    }
+    .room-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .room-item:last-child {
+      border-bottom: none;
+    }
+    .room-info {
+      flex: 1;
+    }
+    .room-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .room-actions button {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .join-btn {
+      background: #4CAF50;
+      color: white;
+    }
+    .create-room-form {
+      margin: 20px 0;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      text-align: center;
+    }
+    .create-room-form input {
+      margin: 10px;
+      padding: 5px;
+    }
+    .create-room-form button {
+      padding: 5px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .game-status {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #f8f8f8;
+      border-radius: 5px;
+    }
+    .game-status h2 {
+      margin: 0;
+      color: #333;
+      font-size: 1.2em;
+    }
+    .countdown {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #ff0000;
+      margin: 10px 0;
+    }
+    .nickname-form {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #f8f8f8;
+      border-radius: 5px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .nickname-form input {
+      padding: 5px 10px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      width: 200px;
+    }
+    .nickname-form button {
+      padding: 5px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .nickname-form button:hover {
+      background: #45a049;
+    }
+    .champion-list {
+      margin: 20px 0;
+      padding: 10px;
+      background: #f8f8f8;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    .champion-list h3 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    .champion-list-items {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+      gap: 5px;
+      padding: 5px;
+    }
+    .champion-item {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid #ccc;
+      transition: all 0.3s ease;
+    }
+    .champion-item:hover {
+      border-color: #2196F3;
+      transform: scale(1.1);
+    }
+    .champion-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="gameRoom" style="display: none;">
+      <div class="game-status">
+        <h2 id="gameStatusMessage">게임이 시작되지 않았습니다. 팀을 선택해주세요.</h2>
+        <div id="countdown" class="countdown" style="display: none;"></div>
+      </div>
+      <div class="nickname-form">
+        <input type="text" id="nicknameInput" placeholder="변경할 닉네임 입력">
+        <button onclick="changeNickname()">닉네임 변경</button>
+      </div>
+      <div class="champion-list">
+        <h3>팀 챔피언 리스트</h3>
+        <div class="champion-list-items" id="championList"></div>
+      </div>
+      <div class="teams-container">
+        <div class="team">
+          <h3>팀 1</h3>
+          <div id="team1Seats"></div>
+        </div>
+        <div class="team">
+          <h3>팀 2</h3>
+          <div id="team2Seats"></div>
+        </div>
+      </div>
+      <div class="waiting-room">
+        <h3>대기실</h3>
+        <div id="waitingSeats"></div>
+      </div>
+      <div class="controls">
+        <button id="startGameBtn" disabled>게임 시작</button>
+        <button id="resetGameBtn" disabled>게임 초기화</button>
+        <button id="rerollBtn" disabled>리롤</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
+  <script>
+    const socket = io();
+    let isHost = false;
+    let rerollCount = 2;
+    let currentChampion = '';
+    let gameStarted = false;
+    let hasJoined = false;
+    let countdownInterval = null; // 카운트다운 타이머를 저장할 전역 변수
+
+    // 초기 화면 설정
+    socket.on('connect', () => {
+      if (!hasJoined) {
+        socket.emit('check-room');
+      }
+    });
+
+    // 닉네임 변경 함수
+    function changeNickname() {
+      const newNickname = document.getElementById('nicknameInput').value.trim();
+      if (newNickname) {
+        socket.emit('change-nickname', newNickname);
+        document.getElementById('nicknameInput').value = '';
+      }
+    }
+
+    // 닉네임 에러 처리
+    socket.on('nickname-error', (message) => {
+      alert(message);
+    });
+
+    // 닉네임 변경 성공
+    socket.on('nickname-changed', (newNickname) => {
+      alert('닉네임이 변경되었습니다: ' + newNickname);
+    });
+
+    // 방 상태 확인
+    socket.on('room-status', (hasRoom) => {
+      if (hasJoined) return;
+
+      if (hasRoom) {
+        // 방이 있으면 자동으로 입장
+        socket.emit('join-room');
+        hasJoined = true;
+        document.getElementById('gameRoom').style.display = 'block';
+      } else {
+        // 방이 없으면 호스트 비밀번호 입력
+        const password = prompt('생성된 방이 없습니다 방을 생성하려면 비밀번호를 입력해주세요!');
+        if (password === 'star') {
+          socket.emit('create-room', { name: '롤 랜덤 챔피언 뽑기' });
+          isHost = true;
+          hasJoined = true;
+          document.getElementById('gameRoom').style.display = 'block';
+          document.getElementById('resetGameBtn').disabled = false;
+        } else {
+          alert('호스트 비밀번호가 틀렸습니다. 페이지를 새로고침하세요.');
+        }
+      }
+    });
+
+    // 닉네임 입력 및 자리 선택
+    socket.on('request-nickname', () => {
+      if (hasJoined) {
+        let nickname;
+        do {
+          nickname = prompt('닉네임을 입력하세요') || '익명';
+          if (!nickname) return;
+        } while (nickname === '익명');
+        socket.emit('set-nickname', nickname);
+      }
+    });
+
+    // 자리 업데이트 함수
+    function updateSeats(players, containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      
+      players.forEach((player, index) => {
+        const seat = document.createElement('div');
+        seat.className = `seat ${player ? 'taken' : ''} ${containerId.includes('team1') ? 'team1' : 
+                         containerId.includes('team2') ? 'team2' : 'waiting'}`;
+        
+        if (player) {
+          const isCurrentPlayer = player.nickname === socket.nickname;
+          const isSameTeam = (containerId.includes('team1') && socket.team === 'team1') || 
+                            (containerId.includes('team2') && socket.team === 'team2');
+          
+          seat.innerHTML = `
+            <div class="player-info">
+              <div class="player-name ${isCurrentPlayer ? 'self' : ''} ${player.isHost ? 'host' : ''}">
+                ${player.nickname}${player.isHost ? ' (호스트)' : ''}
+              </div>
+              ${(isCurrentPlayer || isSameTeam) && player.champion ? 
+                `<div class="champion-display"><img src="/champions/${player.champion}.png" alt="${player.champion}"></div>` : 
+                player.champion ? `<div class="champion-display unknown">???</div>` : ''}
+            </div>
+          `;
+        } else {
+          seat.innerHTML = `
+            <div>자리 ${index + 1}</div>
+            ${!gameStarted ? '<button class="select-btn">선택하기</button>' : ''}
+          `;
+          if (!gameStarted) {
+            seat.querySelector('.select-btn').addEventListener('click', () => {
+              const selectedTeam = containerId.includes('team1') ? 'team1' : 
+                                 containerId.includes('team2') ? 'team2' : 'waiting';
+              socket.team = selectedTeam;
+              socket.emit('select-seat', {
+                team: selectedTeam,
+                index
+              });
+            });
+          }
+        }
+        container.appendChild(seat);
+      });
+    }
+
+    // 리롤 업데이트
+    socket.on('reroll-update', (count) => {
+      console.log('리롤 업데이트 이벤트 수신:', count);
+      const rerollBtn = document.getElementById('rerollBtn');
+      if (rerollBtn) {
+        rerollBtn.disabled = count <= 0;
+        console.log('리롤 버튼 업데이트 완료:', {
+          disabled: rerollBtn.disabled
+        });
+      }
+    });
+
+    // 챔피언 할당
+    socket.on('champion-assigned', (champion) => {
+      currentChampion = champion;
+      updateChampionDisplay();
+    });
+
+    // 게임 상태 업데이트
+    socket.on('game-state', (state) => {
+      // 게임 시작 여부 확인 (챔피언이 할당된 플레이어가 있는지 확인)
+      gameStarted = [...state.team1, ...state.team2].some(player => player && player.champion);
+      console.log('게임 시작 상태:', gameStarted);
+      
+      // 게임 상태 메시지 업데이트
+      const gameStatusMessage = document.getElementById('gameStatusMessage');
+      if (gameStarted) {
+        gameStatusMessage.textContent = '게임이 시작되었습니다!';
+        gameStatusMessage.style.color = '#4CAF50';
+      } else {
+        gameStatusMessage.textContent = '게임이 시작되지 않았습니다. 팀을 선택해주세요.';
+        gameStatusMessage.style.color = '#333';
+      }
+      
+      updateSeats(state.team1, 'team1Seats');
+      updateSeats(state.team2, 'team2Seats');
+      updateSeats(state.waiting, 'waitingSeats');
+      
+      // 호스트인 경우에만 시작 버튼 활성화
+      if (isHost) {
+        const hasWaitingPlayers = state.waiting.some(p => p !== null);
+        document.getElementById('startGameBtn').disabled = hasWaitingPlayers || gameStarted;
+        document.getElementById('resetGameBtn').disabled = false;
+      }
+
+      // 리롤 버튼 업데이트
+      const allPlayers = [...state.team1, ...state.team2, ...state.waiting];
+      const currentPlayer = allPlayers.find(p => p && p.nickname === socket.nickname);
+      
+      if (currentPlayer) {
+        const rerollBtn = document.getElementById('rerollBtn');
+        const rerollCount = currentPlayer.rerollCount !== undefined ? currentPlayer.rerollCount : 2;
+        rerollBtn.disabled = !gameStarted || !rerollCount || rerollCount <= 0;
+        
+        // 리롤 횟수 표시 업데이트
+        let rerollCountDisplay = document.querySelector('.reroll-count-display');
+        if (!rerollCountDisplay) {
+          rerollCountDisplay = document.createElement('span');
+          rerollCountDisplay.className = 'reroll-count-display';
+          rerollBtn.parentNode.insertBefore(rerollCountDisplay, rerollBtn.nextSibling);
+        }
+        rerollCountDisplay.textContent = `(남은 횟수: ${rerollCount}회)`;
+        
+        console.log('게임 상태에서 리롤 버튼 업데이트:', {
+          gameStarted,
+          rerollCount,
+          disabled: rerollBtn.disabled
+        });
+      } else {
+        // 플레이어가 없는 경우 기본값 표시
+        const rerollBtn = document.getElementById('rerollBtn');
+        rerollBtn.disabled = !gameStarted;
+      }
+    });
+
+    // 게임 초기화
+    socket.on('game-reset', () => {
+      const rerollBtn = document.getElementById('rerollBtn');
+      rerollBtn.disabled = true;
+      const rerollCountDisplay = document.querySelector('.reroll-count-display');
+      if (rerollCountDisplay) {
+        rerollCountDisplay.textContent = '(남은 횟수: 2회)';
+      }
+      console.log('게임 초기화: 리롤 횟수 초기화');
+    });
+
+    // 호스트 변경 이벤트
+    socket.on('host-changed', (isNewHost) => {
+      isHost = isNewHost;
+      if (isHost) {
+        document.getElementById('resetGameBtn').disabled = false;
+        alert('호스트 권한이 부여되었습니다.');
+      }
+    });
+
+    // 리롤 버튼 클릭 이벤트
+    document.getElementById('rerollBtn').addEventListener('click', () => {
+      const rerollBtn = document.getElementById('rerollBtn');
+      if (!rerollBtn.disabled) {
+        socket.emit('request-reroll');
+      }
+    });
+
+    // 게임 시작 버튼
+    document.getElementById('startGameBtn').addEventListener('click', () => {
+      socket.emit('start-game');
+    });
+
+    // 게임 초기화 버튼
+    document.getElementById('resetGameBtn').addEventListener('click', () => {
+      socket.emit('reset-game');
+    });
+
+    // 챔피언 표시 업데이트
+    function updateChampionDisplay() {
+      const seats = document.querySelectorAll('.seat.taken');
+      seats.forEach(seat => {
+        const playerName = seat.querySelector('.player-info div').textContent;
+        if (playerName === socket.nickname) {
+          const championDisplay = seat.querySelector('.champion-display') || 
+                                document.createElement('div');
+          championDisplay.className = 'champion-display';
+          championDisplay.innerHTML = `<img src="/champions/${currentChampion}.png" alt="${currentChampion}">`;
+          if (!seat.querySelector('.champion-display')) {
+            seat.querySelector('.player-info').appendChild(championDisplay);
+          }
+        }
+      });
+    }
+
+    // 챔피언 리스트 업데이트
+    function updateChampionList(champions) {
+      const championList = document.getElementById('championList');
+      championList.innerHTML = '';
+      
+      champions.forEach(champion => {
+        const championItem = document.createElement('div');
+        championItem.className = 'champion-item';
+        championItem.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}">`;
+        championItem.addEventListener('click', () => {
+          socket.emit('swap-champion', champion);
+        });
+        championList.appendChild(championItem);
+      });
+    }
+
+    // 챔피언 리스트 업데이트 이벤트
+    socket.on('champion-list-update', (champions) => {
+      updateChampionList(champions);
+    });
+
+    // 카운트다운 시작
+    socket.on('start-countdown', (duration) => {
+      // 기존 타이머가 있다면 초기화
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+
+      const countdownElement = document.getElementById('countdown');
+      countdownElement.style.display = 'block';
+      
+      let timeLeft = duration;
+      countdownInterval = setInterval(() => {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        countdownElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (timeLeft <= 0) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          countdownElement.textContent = '시간 종료!';
+          countdownElement.style.color = '#ff0000';
+          
+          // 리롤 버튼 비활성화
+          document.getElementById('rerollBtn').disabled = true;
+          
+          // 챔피언 리스트 비활성화
+          const championItems = document.querySelectorAll('.champion-item');
+          championItems.forEach(item => {
+            item.style.pointerEvents = 'none';
+            item.style.opacity = '0.5';
+          });
+        }
+        timeLeft--;
+      }, 1000);
+    });
+
+    // 카운트다운 초기화
+    socket.on('countdown-reset', () => {
+      // 기존 타이머가 있다면 초기화
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+
+      const countdownElement = document.getElementById('countdown');
+      countdownElement.style.display = 'none';
+      countdownElement.textContent = '';
+      countdownElement.style.color = '#ff0000';
+      
+      // 리롤 버튼 초기화
+      const rerollBtn = document.getElementById('rerollBtn');
+      rerollBtn.disabled = true;
+      
+      // 챔피언 리스트 초기화
+      const championList = document.getElementById('championList');
+      championList.innerHTML = '';
+      
+      // 게임 상태 메시지 초기화
+      const gameStatusMessage = document.getElementById('gameStatusMessage');
+      gameStatusMessage.textContent = '게임이 시작되지 않았습니다. 팀을 선택해주세요.';
+      gameStatusMessage.style.color = '#333';
+    });
+
+    // 챔피언 스왑 성공 이벤트
+    socket.on('champion-swapped', (data) => {
+      const { oldChampion, newChampion } = data;
+      currentChampion = newChampion;
+      updateChampionDisplay();
+    });
+  </script>
+</body>
+</html>

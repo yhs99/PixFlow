@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const sqlite3 = require('sqlite3').verbose();
 const multer = require('multer');
 const path = require('path');
@@ -8,9 +9,526 @@ const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
 const session = require('express-session');
 require('dotenv').config();
+const { Server } = require('socket.io');
+
+let seats = Array(10).fill(false);
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {cors: {origin: '*'}});
 const port = 3000;
+
+// 게임 상태 관리
+const gameState = {
+  team1: Array(5).fill(null),
+  team2: Array(5).fill(null),
+  waiting: Array(10).fill(null),
+  players: new Map(),
+  host: null,
+  team1Champions: [], // 팀1의 챔피언 리스트
+  team2Champions: []  // 팀2의 챔피언 리스트
+};
+
+// 방 관리
+const rooms = new Map();
+
+const championPool = [
+  'Ahri','LeeSin','Ezreal','Jinx','Thresh',
+  'Yasuo','Lux','Darius','Zed','Vayne'
+];
+
+// 챔피언 목록
+const champions = [
+  'Aatrox', 'Ahri', 'Akali', 'Akshan', 'Alistar', 'Amumu', 'Anivia', 'Annie', 'Aphelios', 'Ashe',
+  'AurelionSol', 'Azir', 'Bard', 'Belveth', 'Blitzcrank', 'Brand', 'Braum', 'Briar', 'Caitlyn',
+  'Camille', 'Cassiopeia', 'Chogath', 'Corki', 'Darius', 'Diana', 'Draven', 'DrMundo', 'Ekko',
+  'Elise', 'Evelynn', 'Ezreal', 'Fiddlesticks', 'Fiora', 'Fizz', 'Galio', 'Gangplank', 'Garen',
+  'Gnar', 'Gragas', 'Graves', 'Gwen', 'Hecarim', 'Heimerdinger', 'Illaoi', 'Irelia', 'Ivern',
+  'Janna', 'JarvanIV', 'Jax', 'Jayce', 'Jhin', 'Jinx', 'Kaisa', 'Kalista', 'Karma', 'Karthus',
+  'Kassadin', 'Katarina', 'Kayle', 'Kayn', 'Kennen', 'Khazix', 'Kindred', 'Kled', 'KogMaw',
+  'KSante', 'Leblanc', 'LeeSin', 'Leona', 'Lillia', 'Lissandra', 'Lucian', 'Lulu', 'Lux',
+  'Malphite', 'Malzahar', 'Maokai', 'MasterYi', 'Milio', 'MissFortune', 'Mordekaiser', 'Morgana',
+  'Naafiri', 'Nami', 'Nasus', 'Nautilus', 'Neeko', 'Nidalee', 'Nilah', 'Nocturne', 'Nunu',
+  'Olaf', 'Orianna', 'Ornn', 'Pantheon', 'Poppy', 'Pyke', 'Qiyana', 'Quinn', 'Rakan', 'Rammus',
+  'RekSai', 'Rell', 'RenataGlasc', 'Renekton', 'Rengar', 'Riven', 'Rumble', 'Ryze', 'Samira',
+  'Sejuani', 'Senna', 'Seraphine', 'Sett', 'Shaco', 'Shen', 'Shyvana', 'Singed', 'Sion', 'Sivir',
+  'Skarner', 'Sona', 'Soraka', 'Swain', 'Sylas', 'Syndra', 'TahmKench', 'Taliyah', 'Talon',
+  'Taric', 'Teemo', 'Thresh', 'Tristana', 'Trundle', 'Tryndamere', 'TwistedFate', 'Twitch',
+  'Udyr', 'Urgot', 'Varus', 'Vayne', 'Veigar', 'Velkoz', 'Vex', 'Vi', 'Viego', 'Viktor', 'Vladimir',
+  'Volibear', 'Warwick', 'Wukong', 'Xayah', 'Xerath', 'XinZhao', 'Yasuo', 'Yone', 'Yorick',
+  'Yuumi', 'Zac', 'Zed', 'Zeri', 'Ziggs', 'Zilean', 'Zoe', 'Zyra'
+];
+
+// 랜덤 챔피언 선택 함수
+function getRandomChampion(teamPlayers, teamChampions) {
+  // 현재 팀에서 이미 선택된 챔피언 목록
+  const usedChampions = teamPlayers
+    .filter(p => p && p.champion)
+    .map(p => p.champion);
+
+  // 팀 챔피언 리스트에 있는 챔피언들도 제외
+  const excludedChampions = [...usedChampions, ...teamChampions];
+
+  // 사용 가능한 챔피언 목록 (이미 선택된 챔피언과 팀 챔피언 리스트 제외)
+  const availableChampions = champions.filter(c => !excludedChampions.includes(c));
+
+  if (availableChampions.length === 0) {
+    return null; // 사용 가능한 챔피언이 없는 경우
+  }
+
+  const randomIndex = Math.floor(Math.random() * availableChampions.length);
+  return availableChampions[randomIndex];
+}
+
+io.on('connection', (socket) => {
+  console.log('새로운 사용자가 연결되었습니다.');
+
+  // 방 상태 확인
+  socket.on('check-room', () => {
+    const hasRoom = rooms.size > 0;
+    socket.emit('room-status', hasRoom);
+  });
+
+  // 방 생성
+  socket.on('create-room', ({ name }) => {
+    if (rooms.size > 0) {
+      socket.emit('room-status', true);
+      return;
+    }
+
+    const roomId = Date.now().toString();
+    const room = {
+      id: roomId,
+      name,
+      players: [],
+      gameState: {
+        team1: Array(5).fill(null),
+        team2: Array(5).fill(null),
+        waiting: Array(10).fill(null),
+        players: new Map(),
+        host: socket.id,
+        team1Champions: [],
+        team2Champions: []
+      }
+    };
+
+    // 호스트를 첫 번째 플레이어로 추가
+    const autoNickname = '플레이어1';
+    socket.nickname = autoNickname;
+    room.players.push(socket.id);
+    room.gameState.players.set(socket.id, {
+      id: socket.id,
+      nickname: autoNickname,
+      team: 'waiting',
+      index: 0,
+      champion: null,
+      rerollCount: 2,
+      isHost: true
+    });
+
+    // 호스트를 대기실에 배치
+    room.gameState.waiting[0] = room.gameState.players.get(socket.id);
+
+    rooms.set(roomId, room);
+    socket.join(roomId);
+    socket.emit('game-state', room.gameState);
+    
+    // 호스트에게 게임 시작 버튼 활성화
+    socket.emit('host-changed', true);
+  });
+
+  // 방 입장
+  socket.on('join-room', () => {
+    const room = Array.from(rooms.values())[0];
+    if (!room || room.players.length >= 10) return;
+
+    // 이미 접속한 플레이어인지 확인
+    const existingPlayer = room.gameState.players.get(socket.id);
+    if (existingPlayer) {
+      // 이미 접속한 플레이어는 자동으로 재연결
+      socket.join(room.id);
+      socket.emit('game-state', room.gameState);
+      return;
+    }
+
+    // 새로운 플레이어에게 자동으로 닉네임 부여
+    const playerNumber = room.players.length + 1;
+    const autoNickname = `플레이어${playerNumber}`;
+    
+    socket.join(room.id);
+    room.players.push(socket.id);
+    socket.nickname = autoNickname;
+    
+    room.gameState.players.set(socket.id, {
+      id: socket.id,
+      nickname: autoNickname,
+      team: 'waiting',
+      index: null,
+      champion: null,
+      rerollCount: 2,
+      isHost: socket.id === room.gameState.host
+    });
+
+    // 빈 대기실 자리 찾기
+    const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
+    if (emptySeatIndex !== -1) {
+      room.gameState.waiting[emptySeatIndex] = room.gameState.players.get(socket.id);
+      room.gameState.players.get(socket.id).index = emptySeatIndex;
+    }
+
+    // 게임 상태 업데이트
+    io.to(room.id).emit('game-state', room.gameState);
+  });
+
+  // 닉네임 변경
+  socket.on('change-nickname', (newNickname) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    // 닉네임 길이 체크
+    if (newNickname.length >= 10) {
+      socket.emit('nickname-error', '닉네임은 10글자 미만이어야 합니다.');
+      return;
+    }
+
+    // 닉네임 중복 확인
+    const isNicknameTaken = Array.from(room.gameState.players.values())
+      .some(player => player.id !== socket.id && player.nickname === newNickname);
+    
+    if (isNicknameTaken) {
+      socket.emit('nickname-error', '이미 사용 중인 닉네임입니다.');
+      return;
+    }
+
+    const player = room.gameState.players.get(socket.id);
+    if (player) {
+      player.nickname = newNickname;
+      socket.nickname = newNickname;
+      socket.emit('nickname-changed', newNickname);
+      io.to(room.id).emit('game-state', room.gameState);
+    }
+  });
+
+  // 호스트 변경 시 플레이어 정보 업데이트
+  socket.on('host-changed', (isNewHost) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (room) {
+      // 모든 플레이어의 호스트 상태 업데이트
+      room.gameState.players.forEach(player => {
+        player.isHost = player.id === room.gameState.host;
+      });
+      io.to(room.id).emit('game-state', room.gameState);
+    }
+  });
+
+  // 자리 선택
+  socket.on('select-seat', ({ team, index }) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    const player = room.gameState.players.get(socket.id);
+    if (!player) return;
+
+    // 이미 선택한 자리가 있는 경우 이전 자리 해제
+    if (player.team && player.index !== null) {
+      room.gameState[player.team][player.index] = null;
+    }
+
+    // 새 자리 할당
+    if (room.gameState[team][index] === null) {
+      room.gameState[team][index] = player;
+      player.team = team;
+      player.index = index;
+      
+      // 대기실에서 제거 (팀1이나 팀2로 이동할 때만)
+      if (player.team !== 'waiting' && player.team === 'waiting') {
+        room.gameState.waiting[player.index] = null;
+      }
+      
+      io.to(room.id).emit('game-state', room.gameState);
+    }
+  });
+
+  // 게임 시작
+  socket.on('start-game', () => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room || socket.id !== room.gameState.host) return;
+
+    // 대기실에 사람이 있으면 시작 불가
+    if (room.gameState.waiting.some(p => p)) return;
+
+    // 팀별로 챔피언 할당
+    const team1Players = room.gameState.team1.filter(p => p !== null);
+    const team2Players = room.gameState.team2.filter(p => p !== null);
+    const waitingPlayers = room.gameState.waiting.filter(p => p !== null);
+
+    // 팀1 챔피언 할당
+    team1Players.forEach(player => {
+      if (player) {
+        player.champion = getRandomChampion(team1Players, room.gameState.team1Champions);
+        player.rerollCount = 2;
+      }
+    });
+
+    // 팀2 챔피언 할당
+    team2Players.forEach(player => {
+      if (player) {
+        player.champion = getRandomChampion(team2Players, room.gameState.team2Champions);
+        player.rerollCount = 2;
+      }
+    });
+
+    // 대기실 플레이어 챔피언 할당
+    waitingPlayers.forEach(player => {
+      if (player) {
+        player.champion = getRandomChampion(waitingPlayers, []);
+        player.rerollCount = 2;
+      }
+    });
+    
+    // 카운트다운 시작
+    const countdownDuration = 180; // 3분
+    io.to(room.id).emit('start-countdown', countdownDuration);
+    
+    // 카운트다운이 끝나면 스왑과 리롤 기능 비활성화
+    setTimeout(() => {
+      io.to(room.id).emit('countdown-finished');
+    }, countdownDuration * 1000);
+    
+    io.to(room.id).emit('game-state', {
+      team1: room.gameState.team1,
+      team2: room.gameState.team2,
+      waiting: room.gameState.waiting
+    });
+  });
+
+  // 게임 초기화
+  socket.on('reset-game', () => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room || socket.id !== room.gameState.host) return;
+
+    // 모든 플레이어의 챔피언과 리롤 횟수 초기화
+    room.gameState.players.forEach(player => {
+      player.champion = null;
+      player.rerollCount = 2;
+    });
+
+    // 챔피언 리스트 초기화
+    room.gameState.team1Champions = [];
+    room.gameState.team2Champions = [];
+
+    // 모든 플레이어를 대기실로 이동
+    let waitingIndex = 0;
+    room.gameState.waiting = Array(10).fill(null);
+    room.gameState.team1 = Array(5).fill(null);
+    room.gameState.team2 = Array(5).fill(null);
+
+    room.gameState.players.forEach(player => {
+      if (waitingIndex < 10) {
+        room.gameState.waiting[waitingIndex] = player;
+        player.team = 'waiting';
+        player.index = waitingIndex;
+        waitingIndex++;
+      }
+    });
+
+    // 카운트다운 초기화 이벤트 전송
+    io.to(room.id).emit('countdown-reset');
+    
+    // 모든 플레이어에게 챔피언 리스트 초기화 이벤트 전송
+    io.to(room.id).emit('champion-list-update', []);
+
+    io.to(room.id).emit('game-state', {
+      team1: room.gameState.team1,
+      team2: room.gameState.team2,
+      waiting: room.gameState.waiting
+    });
+  });
+
+  // 리롤 요청
+  socket.on('request-reroll', () => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    const allPlayers = [...room.gameState.team1, ...room.gameState.team2, ...room.gameState.waiting];
+    const currentPlayer = allPlayers.find(p => p && p.id === socket.id);
+    
+    if (currentPlayer && currentPlayer.rerollCount > 0) {
+      // 현재 플레이어의 팀원들 찾기
+      const teamPlayers = currentPlayer.team === 'team1' ? room.gameState.team1 :
+                         currentPlayer.team === 'team2' ? room.gameState.team2 :
+                         room.gameState.waiting;
+      
+      const teamChampions = currentPlayer.team === 'team1' ? room.gameState.team1Champions :
+                           currentPlayer.team === 'team2' ? room.gameState.team2Champions :
+                           [];
+      
+      const newChampion = getRandomChampion(teamPlayers, teamChampions);
+      if (newChampion) {
+        // 기존 챔피언을 팀 챔피언 리스트에 추가
+        if (currentPlayer.champion) {
+          if (currentPlayer.team === 'team1') {
+            room.gameState.team1Champions.push(currentPlayer.champion);
+          } else if (currentPlayer.team === 'team2') {
+            room.gameState.team2Champions.push(currentPlayer.champion);
+          }
+        }
+
+        currentPlayer.champion = newChampion;
+        currentPlayer.rerollCount--;
+        
+        // 현재 플레이어에게만 리롤 횟수 업데이트
+        socket.emit('reroll-update', currentPlayer.rerollCount);
+        
+        // 같은 팀의 모든 플레이어에게 챔피언 리스트 업데이트
+        const teamSockets = Array.from(room.players)
+          .filter(playerId => {
+            const player = room.gameState.players.get(playerId);
+            return player && player.team === currentPlayer.team;
+          })
+          .map(playerId => io.sockets.sockets.get(playerId));
+
+        if (currentPlayer.team === 'team1') {
+          teamSockets.forEach(teamSocket => {
+            teamSocket.emit('champion-list-update', room.gameState.team1Champions);
+          });
+        } else if (currentPlayer.team === 'team2') {
+          teamSockets.forEach(teamSocket => {
+            teamSocket.emit('champion-list-update', room.gameState.team2Champions);
+          });
+        }
+        
+        io.to(room.id).emit('game-state', {
+          team1: room.gameState.team1,
+          team2: room.gameState.team2,
+          waiting: room.gameState.waiting
+        });
+      }
+    }
+  });
+
+  // 챔피언 스왑 요청
+  socket.on('swap-champion', (targetChampion) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    const currentPlayer = room.gameState.players.get(socket.id);
+    if (!currentPlayer || !currentPlayer.champion) return;
+
+    // 현재 플레이어의 팀 챔피언 리스트 확인
+    const teamChampions = currentPlayer.team === 'team1' ? room.gameState.team1Champions :
+                         currentPlayer.team === 'team2' ? room.gameState.team2Champions :
+                         [];
+
+    // 선택한 챔피언이 팀 리스트에 있는지 확인
+    const championIndex = teamChampions.indexOf(targetChampion);
+    if (championIndex === -1) return;
+
+    // 챔피언 스왑
+    const oldChampion = currentPlayer.champion;
+    currentPlayer.champion = targetChampion;
+    teamChampions[championIndex] = oldChampion;
+
+    // 스왑 성공 이벤트 전송
+    socket.emit('champion-swapped', {
+      oldChampion: oldChampion,
+      newChampion: targetChampion
+    });
+
+    // 같은 팀의 모든 플레이어에게 챔피언 리스트 업데이트
+    const teamSockets = Array.from(room.players)
+      .filter(playerId => {
+        const player = room.gameState.players.get(playerId);
+        return player && player.team === currentPlayer.team;
+      })
+      .map(playerId => io.sockets.sockets.get(playerId));
+
+    if (currentPlayer.team === 'team1') {
+      teamSockets.forEach(teamSocket => {
+        teamSocket.emit('champion-list-update', room.gameState.team1Champions);
+      });
+    } else if (currentPlayer.team === 'team2') {
+      teamSockets.forEach(teamSocket => {
+        teamSocket.emit('champion-list-update', room.gameState.team2Champions);
+      });
+    }
+
+    // 게임 상태 업데이트
+    io.to(room.id).emit('game-state', {
+      team1: room.gameState.team1,
+      team2: room.gameState.team2,
+      waiting: room.gameState.waiting
+    });
+  });
+
+  // 연결 해제
+  socket.on('disconnect', () => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (room) {
+      // 플레이어 제거
+      room.players = room.players.filter(id => id !== socket.id);
+      
+      // 호스트가 나간 경우
+      if (socket.id === room.gameState.host) {
+        // 남은 플레이어가 있으면 첫 번째 플레이어를 호스트로 지정
+        if (room.players.length > 0) {
+          room.gameState.host = room.players[0];
+          // 새 호스트에게 호스트 권한 알림
+          io.to(room.players[0]).emit('host-changed', true);
+        }
+      }
+
+      // 플레이어 정보 제거
+      const player = room.gameState.players.get(socket.id);
+      if (player) {
+        if (player.team && player.index !== null) {
+          room.gameState[player.team][player.index] = null;
+        }
+        room.gameState.players.delete(socket.id);
+      }
+
+      // 방이 비었으면 삭제
+      if (room.players.length === 0) {
+        rooms.delete(room.id);
+      } else {
+        // 게임 상태 업데이트
+        io.to(room.id).emit('game-state', room.gameState);
+      }
+    }
+  });
+
+  // 게임 상태 업데이트 및 브로드캐스트
+  function updateGameState() {
+    const state = {
+      team1: gameState.team1.map(p => p ? {
+        nickname: p.nickname,
+        champion: p.champion,
+        rerollCount: p.rerollCount
+      } : null),
+      team2: gameState.team2.map(p => p ? {
+        nickname: p.nickname,
+        champion: p.champion,
+        rerollCount: p.rerollCount
+      } : null),
+      waiting: gameState.waiting.map(p => p ? {
+        nickname: p.nickname,
+        champion: p.champion,
+        rerollCount: p.rerollCount
+      } : null)
+    };
+    io.emit('game-state', state);
+  }
+
+  // 방 목록 업데이트
+  function updateRoomList() {
+    const roomList = Array.from(rooms.values()).map(room => ({
+      id: room.id,
+      name: room.name,
+      players: room.players
+    }));
+    io.emit('room-list', roomList);
+  }
+});
 
 // 데이터베이스 설정
 const db = new sqlite3.Database('gallery.db', (err) => {
@@ -319,7 +837,7 @@ app.get('/api/images', (req, res) => {
       ...image,
       url: `/uploads/${image.filename}`,
       displayName: image.displayName || '',
-      avatar: image.avatar || 'data:image/png;base64,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'
+      avatar: image.avatar || 'data:image/png;base64,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'
     }));
     
     logImageList(req, imagesWithUrl);
@@ -633,5 +1151,11 @@ app.delete('/api/comments/:id', (req, res) => {
   });
 });
 
+app.get('/lol', (req, res) => {
+  res.render('lol', { championPool });
+});
+
 // 서버 시작
-app.listen(port, '0.0.0.0');
+server.listen(port, '0.0.0.0', () => {
+  console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);
+});
