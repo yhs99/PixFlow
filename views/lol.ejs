@@ -3,11 +3,216 @@
 <head>
   <meta charset="UTF-8">
   <title>롤 랜덤 챔피언 뽑기</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
   <style>
-    .container { max-width: 800px; margin: 20px auto; padding: 20px; }
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --border-color: #cccccc;
+      --seat-bg: #f0f0f0;
+      --seat-taken-bg: #d0d0d0;
+      --container-bg: #f8f8f8;
+      --game-status-bg: #f8f8f8;
+      --nickname-form-bg: #f8f8f8;
+      --champion-list-bg: #f8f8f8;
+      --input-bg: #ffffff;
+      --button-bg: #4CAF50;
+      --button-hover-bg: #45a049;
+      --button-disabled-bg: #cccccc;
+      --team1-border: #ff0000;
+      --team2-border: #0000ff;
+      --waiting-border: #cccccc;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #1a1a2e;
+      --text-color: #ffffff;
+      --border-color: #4a4a6e;
+      --seat-bg: #2a2a4e;
+      --seat-taken-bg: #3a3a5e;
+      --container-bg: #2a2a4e;
+      --game-status-bg: #1a1a2e;
+      --nickname-form-bg: #1a1a2e;
+      --champion-list-bg: #1a1a2e;
+      --input-bg: #2a2a4e;
+      --button-bg: #3a3a5e;
+      --button-hover-bg: #4a4a6e;
+      --button-disabled-bg: #2a2a4e;
+      --team1-border: #ff5f5f;
+      --team2-border: #5f5fff;
+      --waiting-border: #4a4a6e;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: all 0.3s ease;
+    }
+
+    [data-theme="dark"] body {
+      background-image: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #0a0a1e 100%);
+    }
+
+    .container { 
+      max-width: 800px; 
+      margin: 20px auto; 
+      padding: 20px;
+      background-color: var(--container-bg);
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    [data-theme="dark"] .container {
+      box-shadow: 0 0 20px rgba(255,255,255,0.05);
+    }
+
+    .theme-switch {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--text-color);
+      padding: 10px;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .theme-switch:hover {
+      background-color: rgba(255,255,255,0.1);
+    }
+
+    .seat {
+      width: 100%; 
+      height: 80px; 
+      margin: 5px 0;
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center;
+      background: var(--seat-bg); 
+      cursor: pointer; 
+      user-select: none;
+      border-radius: 5px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .seat.taken { 
+      background: var(--seat-taken-bg);
+    }
+
+    .seat.team1 { 
+      border: 2px solid var(--team1-border);
+    }
+
+    .seat.team2 { 
+      border: 2px solid var(--team2-border);
+    }
+
+    .seat.waiting { 
+      border: 2px solid var(--waiting-border);
+    }
+
+    [data-theme="dark"] .seat {
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    [data-theme="dark"] .seat:hover {
+      background: var(--seat-taken-bg);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    [data-theme="dark"] .seat.taken:hover {
+      background: var(--button-bg);
+    }
+
+    [data-theme="dark"] .seat .select-btn {
+      background: var(--button-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+    }
+
+    [data-theme="dark"] .seat .select-btn:hover {
+      background: var(--button-hover-bg);
+    }
+
+    [data-theme="dark"] .seat div {
+      color: var(--text-color);
+    }
+
+    [data-theme="dark"] #team1Seats,
+    [data-theme="dark"] #team2Seats,
+    [data-theme="dark"] #waitingSeats {
+      background: var(--container-bg);
+      border-radius: 5px;
+      padding: 10px;
+      margin: 5px 0;
+    }
+
+    #team1Seats, #team2Seats, #waitingSeats {
+      background: var(--container-bg);
+      border-radius: 5px;
+      padding: 10px;
+      margin: 5px 0;
+      transition: all 0.3s ease;
+    }
+
+    .team {
+      border-color: var(--border-color);
+      background-color: var(--container-bg);
+    }
+
+    .waiting-room {
+      border-color: var(--border-color);
+      background-color: var(--container-bg);
+    }
+
+    [data-theme="dark"] .team,
+    [data-theme="dark"] .waiting-room {
+      border: 1px solid var(--border-color);
+      background-color: rgba(42, 42, 78, 0.8);
+    }
+
+    [data-theme="dark"] .controls button {
+      background-color: #3a3a5e;
+      color: white;
+      border: 1px solid var(--border-color);
+    }
+
+    [data-theme="dark"] .controls button:disabled {
+      background-color: #2a2a4e;
+      color: #666;
+    }
+
+    [data-theme="dark"] .champion-display {
+      border: 2px solid var(--border-color);
+    }
+
     .room-form { margin-bottom: 20px; }
-    .teams-container { display: flex; justify-content: space-between; margin: 20px 0; }
-    .team { width: 48%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    .teams-container { 
+      display: flex; 
+      justify-content: space-between; 
+      margin: 20px 0;
+      gap: 40px;
+    }
+    .team { 
+      width: 48%; 
+      padding: 10px; 
+      border: 1px solid #ccc; 
+      border-radius: 5px;
+      flex: 1;
+    }
     .waiting-room { 
       width: 100%; 
       padding: 10px; 
@@ -20,20 +225,17 @@
       margin-top: 0;
       color: #333;
     }
-    .seat { 
-      width: 100%; height: 80px; margin: 5px 0;
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      background: #f0f0f0; cursor: pointer; user-select: none;
-      border-radius: 5px;
-      position: relative;
+    #waitingSeats {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 10px;
     }
-    .seat.taken { background: #d0d0d0; cursor: not-allowed; }
-    .seat.team1 { border: 2px solid #ff0000; }
-    .seat.team2 { border: 2px solid #0000ff; }
-    .seat.waiting { border: 2px solid #cccccc; }
     .seat .select-btn {
       position: absolute;
       bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
       padding: 2px 8px;
       background: #4CAF50;
       color: white;
@@ -50,18 +252,34 @@
       text-align: center;
       font-size: 12px;
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       height: 100%;
       justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 0 15px;
+    }
+    .seat.team1 .player-info {
+      flex-direction: row;
+    }
+    .seat.team2 .player-info {
+      flex-direction: row-reverse;
     }
     .seat .player-name {
       font-weight: bold;
+      flex: 1;
+      text-align: center;
+      font-size: 16px;
+      margin: 0 10px;
     }
     .seat .player-name.self {
       color: #4CAF50; /* 초록색 */
+      font-weight: bold;
     }
     .seat .player-name.host {
       color: #ff0000; /* 빨간색 */
+      font-weight: bold;
+      text-decoration: underline;
     }
     .seat .champion-display { 
       font-weight: bold; 
@@ -74,6 +292,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      margin: 0 5px;
     }
     .seat .champion-display img {
       width: 100%;
@@ -81,8 +300,8 @@
       object-fit: cover;
     }
     .seat .champion-display.unknown {
-      background-color: #ccc;
-      color: #666;
+      background-color: var(--seat-bg);
+      color: var(--text-color);
       font-size: 12px;
       display: flex;
       align-items: center;
@@ -124,7 +343,7 @@
       transition: all 0.3s ease;
     }
     .controls button:disabled {
-      background-color: #cccccc;
+      background-color: var(--button-disabled-bg);
       cursor: not-allowed;
       opacity: 0.7;
     }
@@ -140,36 +359,6 @@
       color: #666;
       font-size: 14px;
       margin-left: 5px;
-    }
-    #team1Seats, #team2Seats, #waitingSeats {
-      display: flex;
-      flex-direction: column;
-      padding: 5px;
-    }
-    #waitingSeats {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 5px;
-      padding: 5px;
-    }
-    .seat.waiting {
-      border: 2px solid #cccccc;
-      background: #fff;
-      height: 60px;
-    }
-    .seat.waiting .player-info {
-      font-size: 11px;
-    }
-    .seat.waiting .champion-display {
-      font-size: 11px;
-      margin: 2px 0;
-    }
-    .seat.waiting .reroll-count {
-      font-size: 10px;
-    }
-    .seat.waiting .reroll-btn {
-      padding: 1px 6px;
-      font-size: 11px;
     }
     .room-list {
       margin: 20px 0;
@@ -227,8 +416,9 @@
       text-align: center;
       margin-bottom: 20px;
       padding: 10px;
-      background: #f8f8f8;
+      background: var(--game-status-bg);
       border-radius: 5px;
+      border: 1px solid var(--border-color);
     }
     .game-status h2 {
       margin: 0;
@@ -245,35 +435,46 @@
       text-align: center;
       margin-bottom: 20px;
       padding: 10px;
-      background: #f8f8f8;
+      background: var(--nickname-form-bg);
       border-radius: 5px;
       display: flex;
       justify-content: center;
       gap: 10px;
+      border: 1px solid var(--border-color);
     }
     .nickname-form input {
       padding: 5px 10px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
       border-radius: 3px;
       width: 200px;
+      background: var(--input-bg);
+      color: var(--text-color);
     }
-    .nickname-form button {
+    .nickname-form button,
+    .controls button {
       padding: 5px 15px;
-      background: #4CAF50;
+      background: var(--button-bg);
       color: white;
-      border: none;
+      border: 1px solid var(--border-color);
       border-radius: 3px;
       cursor: pointer;
     }
-    .nickname-form button:hover {
-      background: #45a049;
+    .nickname-form button:hover,
+    .controls button:hover {
+      background: var(--button-hover-bg);
+    }
+    .nickname-form button:disabled,
+    .controls button:disabled {
+      background: var(--button-disabled-bg);
+      color: #666;
+      cursor: not-allowed;
     }
     .champion-list {
       margin: 20px 0;
       padding: 10px;
-      background: #f8f8f8;
+      background: var(--champion-list-bg);
       border-radius: 5px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border-color);
     }
     .champion-list h3 {
       margin: 0 0 10px 0;
@@ -291,22 +492,29 @@
       border-radius: 50%;
       overflow: hidden;
       cursor: pointer;
-      border: 2px solid #ccc;
+      border: 2px solid var(--border-color);
       transition: all 0.3s ease;
+      background: var(--seat-bg);
     }
     .champion-item:hover {
-      border-color: #2196F3;
-      transform: scale(1.1);
+      border-color: var(--button-hover-bg);
+      background: var(--seat-taken-bg);
     }
     .champion-item img {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
+    [data-theme="dark"] .team h3,
+    [data-theme="dark"] .waiting-room h3,
+    [data-theme="dark"] .champion-list h3 {
+      color: #8a8aae;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <button class="theme-switch" id="themeSwitch">🌞</button>
     <div id="gameRoom" style="display: none;">
       <div class="game-status">
         <h2 id="gameStatusMessage">게임이 시작되지 않았습니다. 팀을 선택해주세요.</h2>
@@ -330,14 +538,15 @@
           <div id="team2Seats"></div>
         </div>
       </div>
-      <div class="waiting-room">
-        <h3>대기실</h3>
-        <div id="waitingSeats"></div>
-      </div>
       <div class="controls">
         <button id="startGameBtn" disabled>게임 시작</button>
         <button id="resetGameBtn" disabled>게임 초기화</button>
+        <button id="resetRoomBtn" disabled>방 초기화</button>
         <button id="rerollBtn" disabled>리롤</button>
+      </div>
+      <div class="waiting-room">
+        <h3>대기실</h3>
+        <div id="waitingSeats"></div>
       </div>
     </div>
   </div>
@@ -387,6 +596,7 @@
         socket.emit('join-room');
         hasJoined = true;
         document.getElementById('gameRoom').style.display = 'block';
+        document.getElementById('resetRoomBtn').disabled = false;
       } else {
         // 방이 없으면 호스트 비밀번호 입력
         const password = prompt('생성된 방이 없습니다 방을 생성하려면 비밀번호를 입력해주세요!');
@@ -396,23 +606,13 @@
           hasJoined = true;
           document.getElementById('gameRoom').style.display = 'block';
           document.getElementById('resetGameBtn').disabled = false;
+          document.getElementById('resetRoomBtn').disabled = false;
         } else {
           alert('호스트 비밀번호가 틀렸습니다. 페이지를 새로고침하세요.');
         }
       }
     });
 
-    // 닉네임 입력 및 자리 선택
-    socket.on('request-nickname', () => {
-      if (hasJoined) {
-        let nickname;
-        do {
-          nickname = prompt('닉네임을 입력하세요') || '익명';
-          if (!nickname) return;
-        } while (nickname === '익명');
-        socket.emit('set-nickname', nickname);
-      }
-    });
 
     // 자리 업데이트 함수
     function updateSeats(players, containerId) {
@@ -425,14 +625,14 @@
                          containerId.includes('team2') ? 'team2' : 'waiting'}`;
         
         if (player) {
-          const isCurrentPlayer = player.nickname === socket.nickname;
+          const isCurrentPlayer = player.id === socket.id;
           const isSameTeam = (containerId.includes('team1') && socket.team === 'team1') || 
                             (containerId.includes('team2') && socket.team === 'team2');
           
           seat.innerHTML = `
             <div class="player-info">
               <div class="player-name ${isCurrentPlayer ? 'self' : ''} ${player.isHost ? 'host' : ''}">
-                ${player.nickname}${player.isHost ? ' (호스트)' : ''}
+                ${player.nickname}${player.isHost ? ' 👑' : ''}
               </div>
               ${(isCurrentPlayer || isSameTeam) && player.champion ? 
                 `<div class="champion-display"><img src="/champions/${player.champion}.png" alt="${player.champion}"></div>` : 
@@ -441,7 +641,9 @@
           `;
         } else {
           seat.innerHTML = `
-            <div>자리 ${index + 1}</div>
+            <div class="player-info">
+              <div>자리 ${index + 1}</div>
+            </div>
             ${!gameStarted ? '<button class="select-btn">선택하기</button>' : ''}
           `;
           if (!gameStarted) {
@@ -462,13 +664,28 @@
 
     // 리롤 업데이트
     socket.on('reroll-update', (count) => {
-      console.log('리롤 업데이트 이벤트 수신:', count);
       const rerollBtn = document.getElementById('rerollBtn');
       if (rerollBtn) {
         rerollBtn.disabled = count <= 0;
         console.log('리롤 버튼 업데이트 완료:', {
           disabled: rerollBtn.disabled
         });
+        
+        // 리롤 횟수 Toastify 알림
+        Toastify({
+          text: `리롤 잔여 횟수: ${count}회`,
+          duration: 1500,
+          gravity: "bottom",
+          position: "right",
+          style: {
+            background: "linear-gradient(to right, #2196F3, #1976D2)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "14px",
+            padding: "12px",
+            borderRadius: "5px"
+          }
+        }).showToast();
       }
     });
 
@@ -482,7 +699,6 @@
     socket.on('game-state', (state) => {
       // 게임 시작 여부 확인 (챔피언이 할당된 플레이어가 있는지 확인)
       gameStarted = [...state.team1, ...state.team2].some(player => player && player.champion);
-      console.log('게임 시작 상태:', gameStarted);
       
       // 게임 상태 메시지 업데이트
       const gameStatusMessage = document.getElementById('gameStatusMessage');
@@ -502,16 +718,21 @@
       if (isHost) {
         const hasWaitingPlayers = state.waiting.some(p => p !== null);
         document.getElementById('startGameBtn').disabled = hasWaitingPlayers || gameStarted;
-        document.getElementById('resetGameBtn').disabled = false;
+        document.getElementById('resetGameBtn').disabled = !gameStarted;
+        document.getElementById('resetRoomBtn').disabled = false;
       }
 
       // 리롤 버튼 업데이트
       const allPlayers = [...state.team1, ...state.team2, ...state.waiting];
-      const currentPlayer = allPlayers.find(p => p && p.nickname === socket.nickname);
-      
+      const currentPlayer = allPlayers.find(p => p && p.id === socket.id);
       if (currentPlayer) {
         const rerollBtn = document.getElementById('rerollBtn');
         const rerollCount = currentPlayer.rerollCount !== undefined ? currentPlayer.rerollCount : 2;
+        
+        // 리롤 버튼 비활성화 조건:
+        // 1. 게임이 시작되지 않았거나
+        // 2. 리롤 횟수가 0이거나
+        // 3. 리롤 횟수가 없는 경우
         rerollBtn.disabled = !gameStarted || !rerollCount || rerollCount <= 0;
         
         // 리롤 횟수 표시 업데이트
@@ -521,13 +742,24 @@
           rerollCountDisplay.className = 'reroll-count-display';
           rerollBtn.parentNode.insertBefore(rerollCountDisplay, rerollBtn.nextSibling);
         }
-        rerollCountDisplay.textContent = `(남은 횟수: ${rerollCount}회)`;
         
-        console.log('게임 상태에서 리롤 버튼 업데이트:', {
-          gameStarted,
-          rerollCount,
-          disabled: rerollBtn.disabled
-        });
+        // 리롤 횟수가 0일 때 Toastify 알림
+        if (rerollCount === 0) {
+          Toastify({
+            text: "리롤 횟수가 모두 소진되었습니다!",
+            duration: 1500,
+            gravity: "bottom",
+            position: "right",
+            style: {
+              background: "linear-gradient(to right, #f44336, #d32f2f)",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "14px",
+              padding: "12px",
+              borderRadius: "5px"
+            }
+          }).showToast();
+        }
       } else {
         // 플레이어가 없는 경우 기본값 표시
         const rerollBtn = document.getElementById('rerollBtn');
@@ -539,11 +771,6 @@
     socket.on('game-reset', () => {
       const rerollBtn = document.getElementById('rerollBtn');
       rerollBtn.disabled = true;
-      const rerollCountDisplay = document.querySelector('.reroll-count-display');
-      if (rerollCountDisplay) {
-        rerollCountDisplay.textContent = '(남은 횟수: 2회)';
-      }
-      console.log('게임 초기화: 리롤 횟수 초기화');
     });
 
     // 호스트 변경 이벤트
@@ -551,7 +778,20 @@
       isHost = isNewHost;
       if (isHost) {
         document.getElementById('resetGameBtn').disabled = false;
-        alert('호스트 권한이 부여되었습니다.');
+        Toastify({
+          text: "호스트 권한이 부여되었습니다!",
+          duration: 1500,
+          gravity: "top",
+          position: "center",
+          style: {
+            background: "linear-gradient(to right, #00b09b, #96c93d)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "16px",
+            padding: "15px",
+            borderRadius: "5px"
+          }
+        }).showToast();
       }
     });
 
@@ -566,11 +806,88 @@
     // 게임 시작 버튼
     document.getElementById('startGameBtn').addEventListener('click', () => {
       socket.emit('start-game');
+      Toastify({
+        text: "게임이 시작되었습니다!",
+        duration: 1500,
+        gravity: "top",
+        position: "center",
+        style: {
+          background: "linear-gradient(to right, #2196F3, #1976D2)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "16px",
+          padding: "15px",
+          borderRadius: "5px"
+        }
+      }).showToast();
     });
 
     // 게임 초기화 버튼
     document.getElementById('resetGameBtn').addEventListener('click', () => {
       socket.emit('reset-game');
+      Toastify({
+        text: "게임이 초기화되었습니다! 자리를 선택하세요",
+        duration: 1500,
+        gravity: "top",
+        position: "center",
+        style: {
+          background: "linear-gradient(to right, #ff0000, #d32f2f)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "16px",
+          padding: "15px",
+          borderRadius: "5px"
+        }
+      }).showToast();
+    });
+
+    // 방 초기화 버튼
+    document.getElementById('resetRoomBtn').addEventListener('click', () => {
+      const password = prompt('방을 초기화하려면 비밀번호를 입력하세요');
+      if (password) {
+        socket.emit('reset-room', password);
+      }
+    });
+
+    // 방 초기화 에러 처리
+    socket.on('reset-room-error', (message) => {
+      Toastify({
+        text: message,
+        duration: 1500,
+        gravity: "top",
+        position: "center",
+        style: {
+          background: "linear-gradient(to right, #ff0000, #d32f2f)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "16px",
+          padding: "15px",
+          borderRadius: "5px"
+        }
+      }).showToast();
+    });
+
+    // 방 초기화 이벤트 처리
+    socket.on('room-reset', () => {
+      Toastify({
+        text: "방이 초기화되었습니다. 페이지를 새로고침하세요.",
+        duration: 3000,
+        gravity: "top",
+        position: "center",
+        style: {
+          background: "linear-gradient(to right, #ff0000, #d32f2f)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "16px",
+          padding: "15px",
+          borderRadius: "5px"
+        }
+      }).showToast();
+      
+      // 3초 후 페이지 새로고침
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
     });
 
     // 챔피언 표시 업데이트
@@ -681,6 +998,36 @@
       currentChampion = newChampion;
       updateChampionDisplay();
     });
+
+    // 테마 전환 기능
+    const themeSwitch = document.getElementById('themeSwitch');
+    let isDarkTheme = false;
+
+    function toggleTheme() {
+      isDarkTheme = !isDarkTheme;
+      document.documentElement.setAttribute('data-theme', isDarkTheme ? 'dark' : 'light');
+      themeSwitch.textContent = isDarkTheme ? '🌙' : '🌞';
+      
+      // 테마 변경 알림
+      Toastify({
+        text: `${isDarkTheme ? '다크' : '라이트'} 모드로 변경되었습니다`,
+        duration: 1500,
+        gravity: "top",
+        position: "center",
+        style: {
+          background: isDarkTheme ? 
+            "linear-gradient(to right, #1a1a2e, #0a0a1e)" : 
+            "linear-gradient(to right, #00b09b, #96c93d)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "16px",
+          padding: "15px",
+          borderRadius: "5px"
+        }
+      }).showToast();
+    }
+
+    themeSwitch.addEventListener('click', toggleTheme);
   </script>
 </body>
 </html>

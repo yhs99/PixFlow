@@ -26,17 +26,12 @@ const gameState = {
   players: new Map(),
   host: null,
   team1Champions: [], // 팀1의 챔피언 리스트
-  team2Champions: []  // 팀2의 챔피언 리스트
+  team2Champions: [], // 팀2의 챔피언 리스트
+  usedPlayerNumbers: new Set() // 사용된 플레이어 번호 추적
 };
 
 // 방 관리
 const rooms = new Map();
-
-const championPool = [
-  'Ahri','LeeSin','Ezreal','Jinx','Thresh',
-  'Yasuo','Lux','Darius','Zed','Vayne'
-];
-
 // 챔피언 목록
 const champions = [
   'Aatrox', 'Ahri', 'Akali', 'Akshan', 'Alistar', 'Amumu', 'Anivia', 'Annie', 'Aphelios', 'Ashe',
@@ -80,6 +75,16 @@ function getRandomChampion(teamPlayers, teamChampions) {
   return availableChampions[randomIndex];
 }
 
+// 사용되지 않은 플레이어 번호 찾기 함수
+function getNextAvailablePlayerNumber(room) {
+  let number = 1;
+  while (room.gameState.usedPlayerNumbers.has(number)) {
+    number++;
+  }
+  room.gameState.usedPlayerNumbers.add(number);
+  return number;
+}
+
 io.on('connection', (socket) => {
   console.log('새로운 사용자가 연결되었습니다.');
 
@@ -108,12 +113,14 @@ io.on('connection', (socket) => {
         players: new Map(),
         host: socket.id,
         team1Champions: [],
-        team2Champions: []
+        team2Champions: [],
+        usedPlayerNumbers: new Set()
       }
     };
 
     // 호스트를 첫 번째 플레이어로 추가
-    const autoNickname = '플레이어1';
+    const playerNumber = getNextAvailablePlayerNumber(room);
+    const autoNickname = `플레이어${playerNumber}`;
     socket.nickname = autoNickname;
     room.players.push(socket.id);
     room.gameState.players.set(socket.id, {
@@ -151,8 +158,8 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // 새로운 플레이어에게 자동으로 닉네임 부여
-    const playerNumber = room.players.length + 1;
+    // 새로운 플레이어에게 사용되지 않은 번호 할당
+    const playerNumber = getNextAvailablePlayerNumber(room);
     const autoNickname = `플레이어${playerNumber}`;
     
     socket.join(room.id);
@@ -178,6 +185,34 @@ io.on('connection', (socket) => {
 
     // 게임 상태 업데이트
     io.to(room.id).emit('game-state', room.gameState);
+  });
+
+  // 방 초기화
+  socket.on('reset-room', (password) => {
+    if (password !== 'boom') {
+      socket.emit('reset-room-error', '비밀번호가 틀렸습니다.');
+      return;
+    }
+
+    const room = Array.from(rooms.values())[0];
+    if (!room) {
+      socket.emit('reset-room-error', '방이 존재하지 않습니다.');
+      return;
+    }
+
+    // 모든 플레이어 연결 해제
+    room.players.forEach(playerId => {
+      const playerSocket = io.sockets.sockets.get(playerId);
+      if (playerSocket) {
+        playerSocket.leave(room.id);
+      }
+    });
+
+    // 방 삭제
+    rooms.delete(room.id);
+
+    // 모든 플레이어에게 방 초기화 알림
+    io.emit('room-reset');
   });
 
   // 닉네임 변경
@@ -287,7 +322,7 @@ io.on('connection', (socket) => {
     });
     
     // 카운트다운 시작
-    const countdownDuration = 180; // 3분
+    const countdownDuration = 120; // 3분
     io.to(room.id).emit('start-countdown', countdownDuration);
     
     // 카운트다운이 끝나면 스왑과 리롤 기능 비활성화
@@ -473,6 +508,10 @@ io.on('connection', (socket) => {
         // 남은 플레이어가 있으면 첫 번째 플레이어를 호스트로 지정
         if (room.players.length > 0) {
           room.gameState.host = room.players[0];
+          // 모든 플레이어의 호스트 상태 업데이트
+          room.gameState.players.forEach(player => {
+            player.isHost = player.id === room.players[0];
+          });
           // 새 호스트에게 호스트 권한 알림
           io.to(room.players[0]).emit('host-changed', true);
         }
@@ -481,6 +520,10 @@ io.on('connection', (socket) => {
       // 플레이어 정보 제거
       const player = room.gameState.players.get(socket.id);
       if (player) {
+        // 플레이어 번호 해제
+        const playerNumber = parseInt(player.nickname.replace('플레이어', ''));
+        room.gameState.usedPlayerNumbers.delete(playerNumber);
+
         if (player.team && player.index !== null) {
           room.gameState[player.team][player.index] = null;
         }
@@ -1071,7 +1114,7 @@ app.post('/api/comments', express.json(), async (req, res) => {
 
         res.status(201).json({
           id: this.lastID,
-          message: '댓글이 작성되었어요! 🎉'
+          message: '댓글이 작성되었어요! ��'
         });
       }
     );
@@ -1152,7 +1195,7 @@ app.delete('/api/comments/:id', (req, res) => {
 });
 
 app.get('/lol', (req, res) => {
-  res.render('lol', { championPool });
+  res.render('lol', { champions });
 });
 
 // 서버 시작
