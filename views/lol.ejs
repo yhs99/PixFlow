@@ -213,6 +213,12 @@
       border-radius: 5px;
       flex: 1;
     }
+    .team h3 {
+      text-align: left;
+    }
+    .team:nth-child(2) h3 {
+      text-align: right;
+    }
     .waiting-room { 
       width: 100%; 
       padding: 10px; 
@@ -742,24 +748,6 @@
           rerollCountDisplay.className = 'reroll-count-display';
           rerollBtn.parentNode.insertBefore(rerollCountDisplay, rerollBtn.nextSibling);
         }
-        
-        // 리롤 횟수가 0일 때 Toastify 알림
-        if (rerollCount === 0) {
-          Toastify({
-            text: "리롤 횟수가 모두 소진되었습니다!",
-            duration: 1500,
-            gravity: "bottom",
-            position: "right",
-            style: {
-              background: "linear-gradient(to right, #f44336, #d32f2f)",
-              color: "white",
-              fontWeight: "bold",
-              fontSize: "14px",
-              padding: "12px",
-              borderRadius: "5px"
-            }
-          }).showToast();
-        }
       } else {
         // 플레이어가 없는 경우 기본값 표시
         const rerollBtn = document.getElementById('rerollBtn');
@@ -800,6 +788,22 @@
       const rerollBtn = document.getElementById('rerollBtn');
       if (!rerollBtn.disabled) {
         socket.emit('request-reroll');
+      } else {
+        // 리롤 버튼이 비활성화된 상태에서 클릭했을 때만 알림 표시
+        Toastify({
+          text: "리롤 횟수가 모두 소진되었습니다!",
+          duration: 1500,
+          gravity: "bottom",
+          position: "right",
+          style: {
+            background: "linear-gradient(to right, #f44336, #d32f2f)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "14px",
+            padding: "12px",
+            borderRadius: "5px"
+          }
+        }).showToast();
       }
     });
 
