@@ -1,6 +1,6 @@
 const { Client, GatewayIntentBits, Collection, ActivityType } = require('discord.js');
 const fs = require('fs');
-const envPath = process.env.NODE_ENV === 'production' ? 'bot/.env.production' : 'bot/.env';
+const envPath = process.env.NODE_ENV === 'production' ? './bot/.env.production' : './bot/.env';
 require('dotenv').config({ path: envPath });
 const axios = require('axios');
 const FormData = require('form-data');
