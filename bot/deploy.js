@@ -1,10 +1,10 @@
 const { REST, Routes } = require('discord.js');
 const fs = require('fs');
-const envPath = process.env.NODE_ENV === 'production' ? 'bot/.env.production' : 'bot/.env';
+const envPath = process.env.NODE_ENV === 'production' ? './bot/.env.production' : './bot/.env';
 require('dotenv').config({ path: envPath });
-
+console.log(process.env.TOKEN);
 const commands = [];
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+const commandFiles = fs.readdirSync('./bot/commands').filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
@@ -23,7 +23,7 @@ const clientId = process.env.CLIENT_ID;
 
     // ✅ 새 명령어 등록
     console.log('📦 새 명령어 등록 중...');
-    await rest.put(Routes.applicationCommands(clientId), { body: commands });
+    await rest.put(Routes.applicationGuildCommands(clientId, process.env.GUILD_ID), { body: commands });
     console.log('✅ 명령어 등록 완료!');
   } catch (error) {
     console.error('❌ 명령어 등록 중 오류:', error);
