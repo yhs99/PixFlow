@@ -77,16 +77,215 @@ function getRandomChampion(teamPlayers, teamChampions) {
 
 // 사용되지 않은 플레이어 번호 찾기 함수
 function getNextAvailablePlayerNumber(room) {
-  let number = 1;
-  while (room.gameState.usedPlayerNumbers.has(number)) {
-    number++;
+  // 1부터 50까지의 번호 중에서 사용되지 않은 가장 작은 번호 찾기
+  for (let number = 1; number <= 50; number++) {
+    if (!room.gameState.usedPlayerNumbers.has(number)) {
+      room.gameState.usedPlayerNumbers.add(number);
+      return number;
+    }
   }
-  room.gameState.usedPlayerNumbers.add(number);
-  return number;
+  
+  // 모든 번호가 사용 중이면 0번 사용 (비상용)
+  return 0;
 }
 
 io.on('connection', (socket) => {
   console.log('새로운 사용자가 연결되었습니다.');
+
+  // 플레이어 재접속 처리
+  socket.on('reconnect-player', (stats) => {
+    console.log('플레이어 재접속 요청:', stats);
+    const room = Array.from(rooms.values())[0];
+    if (!room) {
+      console.log('방이 존재하지 않습니다. 재접속 요청 무시');
+      // 클라이언트에 방이 없음을 알림
+      socket.emit('room-status', false);
+      return;
+    }
+
+    // 이미 접속한 플레이어인지 확인
+    const existingPlayer = room.gameState.players.get(socket.id);
+    if (existingPlayer) {
+      console.log('이미 접속한 플레이어입니다:', existingPlayer.nickname);
+      // 기존 통계 정보 반환
+      if (existingPlayer.stats) {
+        socket.emit('player-stats-updated', existingPlayer.stats);
+      }
+      return;
+    }
+
+    // 닉네임으로 플레이어를 찾기
+    let foundPlayer = null;
+    let foundPlayerId = null;
+    
+    if (stats.nickname) {
+      // 닉네임이 일치하는 플레이어 찾기
+      room.gameState.players.forEach((player, playerId) => {
+        if (player.nickname === stats.nickname) {
+          foundPlayer = player;
+          foundPlayerId = playerId;
+        }
+      });
+    }
+    
+    if (foundPlayer) {
+      console.log('기존 플레이어 찾음:', foundPlayer.nickname, '통계:', foundPlayer.stats);
+      
+      // 닉네임이 일치하는 플레이어가 이미 접속 중인 경우 처리
+      if (room.players.includes(foundPlayerId)) {
+        console.log('이미 접속 중인 닉네임입니다.');
+        
+        // 새로운 임시 닉네임 생성
+        const playerNumber = getNextAvailablePlayerNumber(room);
+        const tempNickname = `플레이어${playerNumber}`;
+        
+        // 새 플레이어 생성
+        room.players.push(socket.id);
+        socket.nickname = tempNickname;
+        
+        // 통계 정보는 복사하되 닉네임은 새로 설정
+        const tempStats = foundPlayer.stats ? 
+          { ...foundPlayer.stats, nickname: tempNickname } : 
+          { win: 0, lose: 0, rerollCount: 2, nickname: tempNickname };
+        
+        room.gameState.players.set(socket.id, {
+          id: socket.id,
+          nickname: tempNickname,
+          team: 'waiting',
+          index: null,
+          champion: null,
+          stats: tempStats,
+          isHost: false
+        });
+        
+        // 빈 대기실 자리 찾기
+        const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
+        if (emptySeatIndex !== -1) {
+          room.gameState.waiting[emptySeatIndex] = room.gameState.players.get(socket.id);
+          room.gameState.players.get(socket.id).index = emptySeatIndex;
+        }
+        
+        // 클라이언트에 통계 정보 업데이트 전송
+        socket.emit('player-stats-updated', tempStats);
+        
+      } else {
+        // 기존에 연결이 끊어진 플레이어인 경우, 새 소켓으로 대체
+        console.log('연결이 끊어진 플레이어 복원:', foundPlayer.nickname);
+        
+        // 플레이어 ID 업데이트
+        room.gameState.players.delete(foundPlayerId);
+        foundPlayer.id = socket.id;
+        room.gameState.players.set(socket.id, foundPlayer);
+        
+        // 플레이어 리스트 업데이트
+        const playerIndex = room.players.indexOf(foundPlayerId);
+        if (playerIndex !== -1) {
+          room.players[playerIndex] = socket.id;
+        } else {
+          room.players.push(socket.id);
+        }
+        
+        socket.nickname = foundPlayer.nickname;
+        
+        // 자리 업데이트
+        if (foundPlayer.team && foundPlayer.index !== null) {
+          if (room.gameState[foundPlayer.team][foundPlayer.index]) {
+            room.gameState[foundPlayer.team][foundPlayer.index] = foundPlayer;
+          } else {
+            // 자리가 이미 차있는 경우 대기실로 이동
+            foundPlayer.team = 'waiting';
+            const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
+            if (emptySeatIndex !== -1) {
+              room.gameState.waiting[emptySeatIndex] = foundPlayer;
+              foundPlayer.index = emptySeatIndex;
+            }
+          }
+        }
+        
+        // 클라이언트에 통계 정보 업데이트 전송
+        if (foundPlayer.stats) {
+          socket.emit('player-stats-updated', foundPlayer.stats);
+        }
+      }
+      
+      // 게임 상태 업데이트
+      io.to(room.id).emit('game-state', room.gameState);
+      return;
+    }
+    
+    // 기존 플레이어를 찾지 못한 경우 새 플레이어로 처리하되 기존 통계 사용
+    console.log('기존 플레이어를 찾지 못함. 새 플레이어로 등록하되 통계 유지');
+    const playerNumber = getNextAvailablePlayerNumber(room);
+    let nickname = stats.nickname || `플레이어${playerNumber}`;
+    
+    // 닉네임 중복 확인
+    let isDuplicate = false;
+    room.gameState.players.forEach(player => {
+      if (player.nickname === nickname) {
+        isDuplicate = true;
+      }
+    });
+    
+    // 중복이면 임시 닉네임 생성
+    if (isDuplicate) {
+      nickname = `플레이어${playerNumber}`;
+    }
+    
+    socket.join(room.id);
+    room.players.push(socket.id);
+    socket.nickname = nickname;
+    
+    // 기존 통계 사용하되 닉네임 업데이트
+    const playerStats = {
+      ...stats,
+      nickname: nickname
+    };
+    
+    room.gameState.players.set(socket.id, {
+      id: socket.id,
+      nickname: nickname,
+      team: 'waiting',
+      index: null,
+      champion: null,
+      stats: playerStats,
+      isHost: socket.id === room.gameState.host
+    });
+    
+    // 빈 대기실 자리 찾기
+    const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
+    if (emptySeatIndex !== -1) {
+      room.gameState.waiting[emptySeatIndex] = room.gameState.players.get(socket.id);
+      room.gameState.players.get(socket.id).index = emptySeatIndex;
+    }
+    
+    // 클라이언트에 통계 정보 업데이트 전송
+    socket.emit('player-stats-updated', playerStats);
+    
+    // 게임 상태 업데이트
+    io.to(room.id).emit('game-state', room.gameState);
+  });
+
+  // 플레이어 통계 정보 업데이트
+  socket.on('update-player-stats', (stats) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    const player = room.gameState.players.get(socket.id);
+    if (player) {
+      // 통계 정보 업데이트
+      player.stats = {
+        ...stats,
+        nickname: player.nickname // 닉네임은 서버 측에서 관리
+      };
+      console.log('플레이어 통계 정보 업데이트:', player.nickname, player.stats);
+      
+      // 업데이트된 게임 상태 전송
+      io.to(room.id).emit('game-state', room.gameState);
+      
+      // 클라이언트에 통계 정보 업데이트 전송
+      socket.emit('player-stats-updated', player.stats);
+    }
+  });
 
   // 방 상태 확인
   socket.on('check-room', () => {
@@ -95,7 +294,7 @@ io.on('connection', (socket) => {
   });
 
   // 방 생성
-  socket.on('create-room', ({ name }) => {
+  socket.on('create-room', ({ name, stats }) => {
     if (rooms.size > 0) {
       socket.emit('room-status', true);
       return;
@@ -120,16 +319,39 @@ io.on('connection', (socket) => {
 
     // 호스트를 첫 번째 플레이어로 추가
     const playerNumber = getNextAvailablePlayerNumber(room);
-    const autoNickname = `플레이어${playerNumber}`;
-    socket.nickname = autoNickname;
+    
+    // 클라이언트에서 받은 통계 정보 확인
+    let nickname, playerStats;
+    if (stats && typeof stats === 'object') {
+      // 기존 통계 정보 있으면 사용
+      playerStats = {
+        win: stats.win || 0,
+        lose: stats.lose || 0,
+        rerollCount: stats.rerollCount || 2
+      };
+      
+      // 닉네임이 있으면 사용, 아니면 기본값 생성
+      nickname = stats.nickname || `플레이어${playerNumber}`;
+    } else {
+      // 통계 정보가 없으면 기본값 사용
+      playerStats = {
+        win: 0,
+        lose: 0,
+        rerollCount: 2
+      };
+      nickname = `플레이어${playerNumber}`;
+    }
+    
+    console.log('방 생성 시 사용할 닉네임:', nickname, '통계 정보:', playerStats);
+    socket.nickname = nickname;
     room.players.push(socket.id);
     room.gameState.players.set(socket.id, {
       id: socket.id,
-      nickname: autoNickname,
+      nickname: nickname,
       team: 'waiting',
       index: 0,
       champion: null,
-      rerollCount: 2,
+      stats: playerStats,
       isHost: true
     });
 
@@ -142,6 +364,9 @@ io.on('connection', (socket) => {
     
     // 호스트에게 게임 시작 버튼 활성화
     socket.emit('host-changed', true);
+    
+    // 통계 정보 업데이트 전송
+    socket.emit('player-stats-updated', playerStats);
   });
 
   // 방 입장
@@ -172,7 +397,11 @@ io.on('connection', (socket) => {
       team: 'waiting',
       index: null,
       champion: null,
-      rerollCount: 2,
+      stats: {
+        win: 0,
+        lose: 0,
+        rerollCount: 2
+      },
       isHost: socket.id === room.gameState.host
     });
 
@@ -199,6 +428,9 @@ io.on('connection', (socket) => {
       socket.emit('reset-room-error', '방이 존재하지 않습니다.');
       return;
     }
+
+    // 플레이어 번호 초기화
+    room.gameState.usedPlayerNumbers.clear();
 
     // 모든 플레이어 연결 해제
     room.players.forEach(playerId => {
@@ -238,6 +470,10 @@ io.on('connection', (socket) => {
     const player = room.gameState.players.get(socket.id);
     if (player) {
       player.nickname = newNickname;
+      // 통계 정보의 닉네임도 업데이트
+      if (player.stats) {
+        player.stats.nickname = newNickname;
+      }
       socket.nickname = newNickname;
       socket.emit('nickname-changed', newNickname);
       io.to(room.id).emit('game-state', room.gameState);
@@ -382,21 +618,36 @@ io.on('connection', (socket) => {
     const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
     if (!room || socket.id !== room.gameState.host) return;
 
+    console.log(`게임 초기화: 승리 팀 = ${winningTeam}`);
+
     // 모든 플레이어의 챔피언만 초기화 (리롤 횟수는 유지)
     room.gameState.players.forEach(player => {
       player.champion = null;
       
-      // 패배한 팀에게 리롤 횟수 1회 추가
-      if (winningTeam && player.team && player.team !== winningTeam) {
-        player.rerollCount = (player.rerollCount || 0) + 1;
-        
-        // 리롤 횟수 추가 알림 전송
-        const playerSocket = io.sockets.sockets.get(player.id);
-        if (playerSocket) {
-          playerSocket.emit('reroll-bonus', {
-            message: '패배 보상: 리롤 횟수 +1',
-            newCount: player.rerollCount
-          });
+      // 패배한 팀에게 리롤 횟수 1회 추가 및 승패 기록
+      if (winningTeam && player.team) {
+        if (player.team !== winningTeam) {
+          // 패배 처리
+          if (player.stats) {
+            player.stats.rerollCount = (player.stats.rerollCount || 0) + 1;
+            player.stats.lose = (player.stats.lose || 0) + 1;
+            console.log(`패배 처리: ${player.nickname} - 패배 ${player.stats.lose}회, 리롤 ${player.stats.rerollCount}회`);
+          }
+          
+          // 리롤 횟수 추가 알림 전송
+          const playerSocket = io.sockets.sockets.get(player.id);
+          if (playerSocket) {
+            playerSocket.emit('reroll-bonus', {
+              message: '패배 보상: 리롤 횟수 +1',
+              newCount: player.stats ? player.stats.rerollCount : 1
+            });
+          }
+        } else if (player.team === winningTeam) {
+          // 승리 처리
+          if (player.stats) {
+            player.stats.win = (player.stats.win || 0) + 1;
+            console.log(`승리 처리: ${player.nickname} - 승리 ${player.stats.win}회`);
+          }
         }
       }
     });
@@ -438,7 +689,7 @@ io.on('connection', (socket) => {
     const allPlayers = [...room.gameState.team1, ...room.gameState.team2, ...room.gameState.waiting];
     const currentPlayer = allPlayers.find(p => p && p.id === socket.id);
     
-    if (currentPlayer && currentPlayer.rerollCount > 0) {
+    if (currentPlayer && currentPlayer.stats && currentPlayer.stats.rerollCount > 0) {
       // 현재 플레이어의 팀원들 찾기
       const teamPlayers = currentPlayer.team === 'team1' ? room.gameState.team1 :
                          currentPlayer.team === 'team2' ? room.gameState.team2 :
@@ -460,10 +711,11 @@ io.on('connection', (socket) => {
         }
 
         currentPlayer.champion = newChampion;
-        currentPlayer.rerollCount--;
+        // 통계에서 리롤 카운트 차감
+        currentPlayer.stats.rerollCount--;
         
         // 현재 플레이어에게만 리롤 횟수 업데이트
-        socket.emit('reroll-update', currentPlayer.rerollCount);
+        socket.emit('reroll-update', currentPlayer.stats.rerollCount);
         
         // 같은 팀의 모든 플레이어에게 챔피언 리스트 업데이트
         const teamSockets = Array.from(room.players)
@@ -563,9 +815,13 @@ io.on('connection', (socket) => {
       // 플레이어 정보 제거
       const player = room.gameState.players.get(socket.id);
       if (player) {
-        // 플레이어 번호 해제
-        const playerNumber = parseInt(player.nickname.replace('플레이어', ''));
-        room.gameState.usedPlayerNumbers.delete(playerNumber);
+        // 플레이어 번호 해제 (닉네임이 "플레이어xx" 형식인 경우만)
+        const nicknameMatch = player.nickname.match(/^플레이어(\d+)$/);
+        if (nicknameMatch) {
+          const playerNumber = parseInt(nicknameMatch[1]);
+          room.gameState.usedPlayerNumbers.delete(playerNumber);
+          console.log(`플레이어 번호 해제: ${playerNumber}`);
+        }
 
         if (player.team && player.index !== null) {
           room.gameState[player.team][player.index] = null;
@@ -589,17 +845,17 @@ io.on('connection', (socket) => {
       team1: gameState.team1.map(p => p ? {
         nickname: p.nickname,
         champion: p.champion,
-        rerollCount: p.rerollCount
+        rerollCount: p.stats ? p.stats.rerollCount : 0
       } : null),
       team2: gameState.team2.map(p => p ? {
         nickname: p.nickname,
         champion: p.champion,
-        rerollCount: p.rerollCount
+        rerollCount: p.stats ? p.stats.rerollCount : 0
       } : null),
       waiting: gameState.waiting.map(p => p ? {
         nickname: p.nickname,
         champion: p.champion,
-        rerollCount: p.rerollCount
+        rerollCount: p.stats ? p.stats.rerollCount : 0
       } : null)
     };
     io.emit('game-state', state);
