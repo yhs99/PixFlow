@@ -26,6 +26,8 @@
       --waiting-border: #cccccc;
       --modal-bg: rgba(0, 0, 0, 0.7);
       --modal-content-bg: #ffffff;
+      --win-color: #4CAF50;
+      --lose-color: #f44336;
     }
 
     [data-theme="dark"] {
@@ -47,6 +49,8 @@
       --waiting-border: #4a4a6e;
       --modal-bg: rgba(0, 0, 0, 0.9);
       --modal-content-bg: #2a2a4e;
+      --win-color: #4CAF50;
+      --lose-color: #f44336;
     }
 
     body {
@@ -615,6 +619,45 @@
       opacity: 0.9;
       transform: scale(1.05);
     }
+
+    /* 플레이어 통계 스타일 */
+    .player-stats {
+      font-size: 11px;
+      margin-top: 5px;
+      display: flex;
+      gap: 5px;
+      justify-content: center;
+      background-color: rgba(0, 0, 0, 0.05);
+      border-radius: 10px;
+      padding: 2px 5px;
+      margin: 3px auto;
+      max-width: fit-content;
+    }
+
+    [data-theme="dark"] .player-stats {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .player-stats .win {
+      color: var(--win-color);
+      font-weight: bold;
+    }
+    
+    .player-stats .lose {
+      color: var(--lose-color);
+      font-weight: bold;
+    }
+    
+    .player-stats .winrate {
+      color: var(--text-color);
+      opacity: 0.8;
+    }
+
+    .player-name {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -668,8 +711,16 @@
     let countdownInterval = null; // 카운트다운 타이머를 저장할 전역 변수
     let isDarkTheme = false;      // 테마 상태 변수
     
+    // 플레이어 통계를 위한 변수
+    let playerStats = {
+      nickname: '',
+      win: 0,
+      lose: 0,
+      rerollCount: 2
+    };
+    
     // 현재 공지사항 버전 - 업데이트마다 숫자를 올려주세요
-    const NOTICE_VERSION = "1.0";
+    const NOTICE_VERSION = "1.1";
 
     // 쿠키 설정 함수
     function setCookie(name, value, days) {
@@ -694,6 +745,45 @@
       return null;
     }
 
+    // 플레이어 통계 초기화 함수
+    function initPlayerStats() {
+      // 로컬 스토리지에서 통계 확인
+      const savedStats = localStorage.getItem('playerStats');
+      
+      if (savedStats) {
+        // 저장된 통계가 있다면 불러오기
+        playerStats = JSON.parse(savedStats);
+        console.log('저장된 플레이어 통계 정보 불러옴:', playerStats);
+      } else {
+        // 저장된 통계가 없다면 기본값 설정
+        playerStats = {
+          nickname: `플레이어${Math.floor(Math.random() * 50) + 1}`, // 1~50 사이의 랜덤 번호
+          win: 0,
+          lose: 0,
+          rerollCount: 2
+        };
+        // 로컬 스토리지에 저장
+        localStorage.setItem('playerStats', JSON.stringify(playerStats));
+        console.log('새 플레이어 통계 정보 생성:', playerStats);
+      }
+      
+      // 접속 상태 저장
+      hasJoined = localStorage.getItem('hasJoined') === 'true';
+      
+      // 이미 방에 참여한 상태였다면 바로 표시
+      if (hasJoined) {
+        document.getElementById('gameRoom').style.display = 'block';
+      }
+      
+      // 초기 접속 시에만 서버에 통계 전송
+      socket.emit('update-player-stats', playerStats);
+    }
+    
+    // 플레이어 통계 저장 함수 (로컬에만 저장)
+    function savePlayerStats() {
+      localStorage.setItem('playerStats', JSON.stringify(playerStats));
+    }
+    
     // 페이지 로드 시 쿠키에서 테마 설정 읽기
     function loadThemeFromCookie() {
       const savedTheme = getCookie("darkMode");
@@ -707,15 +797,32 @@
         document.getElementById('themeSwitch').textContent = '🌞';
       }
     }
-
+    
     // 페이지 로드 시 테마 설정 로드
     document.addEventListener('DOMContentLoaded', () => {
       loadThemeFromCookie();
+      initPlayerStats(); // 플레이어 통계 초기화
       setTimeout(showNotice, 1000); // 1초 후 공지사항 표시
     });
 
     // 초기 화면 설정
     socket.on('connect', () => {
+      console.log('서버에 연결되었습니다. 소켓 ID:', socket.id);
+      // 소켓 ID를 로컬 스토리지에 저장
+      const prevSocketId = localStorage.getItem('socketId');
+      localStorage.setItem('socketId', socket.id);
+      
+      // 이전에 저장된 통계 정보가 있으면 서버에 전송
+      const savedStats = localStorage.getItem('playerStats');
+      if (savedStats) {
+        const stats = JSON.parse(savedStats);
+        // 소켓 ID가 변경된 경우(재접속) 기존 통계 정보를 서버에 전송
+        if (prevSocketId !== socket.id) {
+          console.log('재접속 감지: 통계 정보 전송');
+          socket.emit('reconnect-player', stats);
+        }
+      }
+      
       if (!hasJoined) {
         socket.emit('check-room');
       }
@@ -726,9 +833,25 @@
       const newNickname = document.getElementById('nicknameInput').value.trim();
       if (newNickname) {
         socket.emit('change-nickname', newNickname);
+        // 플레이어 통계에도 닉네임 업데이트
+        playerStats.nickname = newNickname;
+        savePlayerStats();
+        // 닉네임이 변경되었으므로 서버에 통계 전송
+        socket.emit('update-player-stats', playerStats);
         document.getElementById('nicknameInput').value = '';
       }
     }
+    
+    // 서버에서 통계 정보 업데이트 이벤트 수신
+    socket.on('player-stats-updated', (updatedStats) => {
+      console.log('서버에서 통계 정보 업데이트 수신:', updatedStats);
+      // 로컬 통계 정보 업데이트
+      playerStats = {
+        ...playerStats,
+        ...updatedStats
+      };
+      savePlayerStats();
+    });
 
     // 닉네임 에러 처리
     socket.on('nickname-error', (message) => {
@@ -738,25 +861,47 @@
     // 닉네임 변경 성공
     socket.on('nickname-changed', (newNickname) => {
       alert('닉네임이 변경되었습니다: ' + newNickname);
+      // 플레이어 통계에도 닉네임 업데이트
+      playerStats.nickname = newNickname;
+      savePlayerStats();
+      // 닉네임이 변경되었으므로 서버에 통계 전송
+      socket.emit('update-player-stats', playerStats);
     });
 
     // 방 상태 확인
     socket.on('room-status', (hasRoom) => {
-      if (hasJoined) return;
-
       if (hasRoom) {
         // 방이 있으면 자동으로 입장
+        if (hasJoined) {
+          console.log('이미 참여한 상태로 방 재입장');
+        } else {
+          console.log('새로운 플레이어로 방 입장');
+          hasJoined = true;
+          localStorage.setItem('hasJoined', 'true');
+        }
         socket.emit('join-room');
-        hasJoined = true;
         document.getElementById('gameRoom').style.display = 'block';
         document.getElementById('resetRoomBtn').disabled = false;
       } else {
-        // 방이 없으면 호스트 비밀번호 입력
+        // 방이 없으면 호스트 비밀번호 입력 및 hasJoined 초기화
+        console.log('방이 없습니다. 생성 프로세스 시작');
+        hasJoined = false;
+        localStorage.removeItem('hasJoined');
+        
         const password = prompt('생성된 방이 없습니다 방을 생성하려면 비밀번호를 입력해주세요!');
         if (password === 'star') {
-          socket.emit('create-room', { name: '롤 랜덤 챔피언 뽑기' });
+          // 방 생성 시 현재 플레이어 통계 정보도 함께 전송
+          console.log('방 생성 시 전송할 통계 정보:', playerStats);
+          socket.emit('create-room', { 
+            name: '롤 랜덤 챔피언 뽑기',
+            stats: playerStats
+          });
           isHost = true;
           hasJoined = true;
+          localStorage.setItem('hasJoined', 'true');
+          
+          // 닉네임과 상태 표시 업데이트
+          document.getElementById('nicknameInput').placeholder = playerStats.nickname;
           document.getElementById('gameRoom').style.display = 'block';
           document.getElementById('resetGameBtn').disabled = false;
           document.getElementById('resetRoomBtn').disabled = false;
@@ -765,7 +910,6 @@
         }
       }
     });
-
 
     // 자리 업데이트 함수
     function updateSeats(players, containerId) {
@@ -782,10 +926,20 @@
           const isSameTeam = (containerId.includes('team1') && socket.team === 'team1') || 
                             (containerId.includes('team2') && socket.team === 'team2');
           
+          // 승률 계산
+          const winRate = player.stats && (player.stats.win + player.stats.lose > 0) ? 
+                         Math.round((player.stats.win / (player.stats.win + player.stats.lose)) * 100) : 0;
+          
           seat.innerHTML = `
             <div class="player-info">
               <div class="player-name ${isCurrentPlayer ? 'self' : ''} ${player.isHost ? 'host' : ''}">
                 ${player.nickname}${player.isHost ? ' 👑' : ''}
+                ${player.stats ? `
+                <div class="player-stats">
+                  <span class="win">${player.stats.win}승</span> 
+                  <span class="lose">${player.stats.lose}패</span> 
+                  <span class="winrate">(${winRate}%)</span>
+                </div>` : ''}
               </div>
               ${player.champion ? 
                 (isCurrentPlayer || isSameTeam ? 
@@ -824,6 +978,13 @@
         console.log('리롤 버튼 업데이트 완료:', {
           disabled: rerollBtn.disabled
         });
+        
+        // 리롤 카운트가 변경된 경우에만 업데이트
+        if (playerStats.rerollCount !== count) {
+          // 플레이어 통계 업데이트
+          playerStats.rerollCount = count;
+          savePlayerStats();
+        }
         
         // 리롤 횟수 Toastify 알림
         Toastify({
@@ -877,6 +1038,26 @@
         myTeam = currentPlayer.team;
         socket.team = myTeam;
         
+        // 현재 플레이어의 통계 정보 가져오기
+        if (currentPlayer.stats) {
+          // 플레이어 통계 정보에 변화가 있는지 확인
+          const statsChanged = 
+            playerStats.win !== currentPlayer.stats.win ||
+            playerStats.lose !== currentPlayer.stats.lose ||
+            playerStats.rerollCount !== currentPlayer.stats.rerollCount;
+          
+          if (statsChanged) {
+            // 플레이어 통계 정보 업데이트
+            playerStats = {
+              ...playerStats,
+              win: currentPlayer.stats.win,
+              lose: currentPlayer.stats.lose,
+              rerollCount: currentPlayer.stats.rerollCount
+            };
+            savePlayerStats();
+          }
+        }
+        
         // 내 팀이 있고 팀 챔피언 리스트가 존재하면 업데이트
         if (myTeam && state[`${myTeam}Champions`]) {
           updateChampionList(state[`${myTeam}Champions`]);
@@ -903,7 +1084,8 @@
       // 리롤 버튼 업데이트
       if (currentPlayer) {
         const rerollBtn = document.getElementById('rerollBtn');
-        const rerollCount = currentPlayer.rerollCount !== undefined ? currentPlayer.rerollCount : 2;
+        // 현재 플레이어의 리롤 횟수 업데이트
+        const rerollCount = currentPlayer.stats ? currentPlayer.stats.rerollCount : 2;
         
         // 리롤 버튼 비활성화 조건:
         // 1. 게임이 시작되지 않았거나
@@ -919,6 +1101,12 @@
           rerollBtn.parentNode.insertBefore(rerollCountDisplay, rerollBtn.nextSibling);
         }
         rerollCountDisplay.textContent = ` (${rerollCount}회)`;
+        
+        // 플레이어 통계의 리롤 카운트가 서버와 다를 경우에만 업데이트
+        if (playerStats.rerollCount !== rerollCount) {
+          playerStats.rerollCount = rerollCount;
+          savePlayerStats();
+        }
       } else {
         // 플레이어가 없는 경우 기본값 표시
         const rerollBtn = document.getElementById('rerollBtn');
@@ -951,37 +1139,6 @@
             borderRadius: "5px"
           }
         }).showToast();
-      }
-    });
-
-    // 리롤 버튼 클릭 이벤트
-    document.getElementById('rerollBtn').addEventListener('click', () => {
-      const rerollBtn = document.getElementById('rerollBtn');
-      if (!rerollBtn.disabled) {
-        socket.emit('request-reroll');
-      } else {
-        // 리롤 버튼이 비활성화된 상태에서 클릭했을 때만 알림 표시
-        Toastify({
-          text: "리롤 횟수가 모두 소진되었습니다!",
-          duration: 1500,
-          gravity: "bottom",
-          position: "right",
-          style: {
-            background: "linear-gradient(to right, #f44336, #d32f2f)",
-            color: "white",
-            fontWeight: "bold",
-            fontSize: "14px",
-            padding: "12px",
-            borderRadius: "5px"
-          }
-        }).showToast();
-      }
-    });
-
-    // 게임 시작 버튼
-    document.getElementById('startGameBtn').addEventListener('click', () => {
-      if (isHost) {
-        socket.emit('start-game');
       }
     });
 
@@ -1031,7 +1188,7 @@
           <div class="win-team-buttons">
             <button id="team1Win">팀 1 승리</button>
             <button id="team2Win">팀 2 승리</button>
-            <button id="noWinner">승자 없음</button>
+            <button id="noWinner">취소</button>
           </div>
         </div>
       `;
@@ -1096,11 +1253,13 @@
       
       // 버튼 이벤트 리스너
       document.getElementById('team1Win').addEventListener('click', () => {
+        // 승리 팀 정보만 서버에 전송하고 승패 처리는 서버에서 수행
         socket.emit('reset-game', { winningTeam: 'team1' });
         document.body.removeChild(modal);
       });
       
       document.getElementById('team2Win').addEventListener('click', () => {
+        // 승리 팀 정보만 서버에 전송하고 승패 처리는 서버에서 수행
         socket.emit('reset-game', { winningTeam: 'team2' });
         document.body.removeChild(modal);
       });
@@ -1153,6 +1312,10 @@
           borderRadius: "5px"
         }
       }).showToast();
+      
+      // 접속 상태 초기화
+      hasJoined = false;
+      localStorage.removeItem('hasJoined');
       
       // 3초 후 페이지 새로고침
       setTimeout(() => {
@@ -1360,6 +1523,11 @@
 
     // 리롤 보너스 알림
     socket.on('reroll-bonus', (data) => {
+      // 서버에서 전송한 업데이트된 통계 값만 사용
+      playerStats.rerollCount = data.newCount;
+      // 승패 처리는 서버에서 이미 처리되므로 여기서는 통계만 업데이트
+      savePlayerStats();
+      
       Toastify({
         text: data.message + ` (현재: ${data.newCount})`,
         duration: 3000,
@@ -1392,19 +1560,25 @@
           <div class="notice-title">업데이트 안내</div>
           <div class="notice-content">
             <div class="notice-update-item">
-              <b>랜덤 배정 기능 추가</b>: 호스트는 이제 대기실의 플레이어들을 랜덤으로 두 팀에 배정할 수 있습니다. (팀에 이미 플레이어가 있으면 비활성화됩니다)
+              <b>플레이어 통계 시스템 추가</b>: 이제 각 플레이어의 승리, 패배, 승률이 표시됩니다.
+            </div>
+            <div class="notice-update-item">
+              <b>재접속 기능 개선</b>: 페이지를 새로고침하거나 브라우저를 재시작해도 닉네임이 유지됩니다.
+            </div>
+            <div class="notice-update-item">
+              <b>랜덤 배정 기능 추가</b>: 호스트는 이제 대기실의 플레이어들을 랜덤으로 두 팀에 배정할 수 있습니다. (팀칸에 이미 플레이어가 있으면 비활성화됩니다)
             </div>
             <div class="notice-update-item">
               <b>승리/패배 팀 선택</b>: 게임 종료 후 호스트가 승리 팀을 선택하면 패배 팀은 리롤 횟수 +1을 보상으로 받습니다.
             </div>
             <div class="notice-update-item">
-              <b>리롤 시스템 개선</b>: 리롤 횟수가 이제 게임 간에 유지됩니다. 새 플레이어는 기본 2회의 리롤을 갖습니다.
+              <b>리롤 시스템 개선</b>: 리롤 횟수가 플레이어마다 지급 및 저장됩니다. 새 플레이어는 기본 2회의 리롤을 갖습니다.
             </div>
             <div class="notice-update-item">
-              <b>다크 모드 설정 저장</b>: 테마 설정이 이제 쿠키에 저장되어 브라우저를 닫았다가 다시 열어도 설정이 유지됩니다.
+              <b>다크 모드 설정 저장</b>: 테마 설정 저장되어 브라우저를 닫았다가 다시 열어도 설정이 유지됩니다.
             </div>
             <div class="notice-update-item">
-              <b>UI 개선</b>: 팀 챔피언 리스트 표시 및 다양한 사용자 경험 개선이 추가되었습니다.
+              <b>UI 개선</b>: UI를 개선했습니다.
             </div>
           </div>
           <div class="notice-buttons">
@@ -1425,6 +1599,38 @@
         document.body.removeChild(modal);
       });
     }
+
+    // 리롤 버튼 클릭 이벤트
+    document.getElementById('rerollBtn').addEventListener('click', () => {
+      const rerollBtn = document.getElementById('rerollBtn');
+      if (!rerollBtn.disabled && playerStats.rerollCount > 0) {
+        socket.emit('request-reroll');
+        // 로컬 리롤 카운트는 서버의 응답을 통해 업데이트 (중복 방지)
+      } else {
+        // 리롤 버튼이 비활성화된 상태에서 클릭했을 때만 알림 표시
+        Toastify({
+          text: "리롤 횟수가 모두 소진되었습니다!",
+          duration: 1500,
+          gravity: "bottom",
+          position: "right",
+          style: {
+            background: "linear-gradient(to right, #f44336, #d32f2f)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "14px",
+            padding: "12px",
+            borderRadius: "5px"
+          }
+        }).showToast();
+      }
+    });
+    
+    // 게임 시작 버튼
+    document.getElementById('startGameBtn').addEventListener('click', () => {
+      if (isHost) {
+        socket.emit('start-game');
+      }
+    });
   </script>
 </body>
 </html>
