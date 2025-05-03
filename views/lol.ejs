@@ -24,6 +24,8 @@
       --team1-border: #ff0000;
       --team2-border: #0000ff;
       --waiting-border: #cccccc;
+      --modal-bg: rgba(0, 0, 0, 0.7);
+      --modal-content-bg: #ffffff;
     }
 
     [data-theme="dark"] {
@@ -43,6 +45,8 @@
       --team1-border: #ff5f5f;
       --team2-border: #5f5fff;
       --waiting-border: #4a4a6e;
+      --modal-bg: rgba(0, 0, 0, 0.9);
+      --modal-content-bg: #2a2a4e;
     }
 
     body {
@@ -484,14 +488,27 @@
     }
     .champion-list h3 {
       margin: 0 0 10px 0;
-      color: #333;
+      color: var(--text-color);
     }
     .champion-list-items {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-      gap: 5px;
+      gap: 10px;
       padding: 5px;
+      min-height: 60px;
+      width: 100%;
     }
+    
+    .empty-champion-list {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 10px;
+      color: var(--text-color);
+      font-style: italic;
+      width: 100%;
+      display: block;
+    }
+    
     .champion-item {
       width: 48px;
       height: 48px;
@@ -505,6 +522,7 @@
     .champion-item:hover {
       border-color: var(--button-hover-bg);
       background: var(--seat-taken-bg);
+      transform: scale(1.1);
     }
     .champion-item img {
       width: 100%;
@@ -515,6 +533,87 @@
     [data-theme="dark"] .waiting-room h3,
     [data-theme="dark"] .champion-list h3 {
       color: #8a8aae;
+    }
+
+    /* 공지사항 모달 스타일 */
+    .notice-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--modal-bg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .notice-modal-content {
+      background-color: var(--modal-content-bg);
+      color: var(--text-color);
+      padding: 30px;
+      border-radius: 10px;
+      text-align: left;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .notice-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-align: center;
+      color: var(--button-bg);
+    }
+
+    .notice-content {
+      margin-bottom: 20px;
+    }
+
+    .notice-update-item {
+      margin-bottom: 15px;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .notice-update-item:before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--button-bg);
+    }
+
+    .notice-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    .notice-buttons button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .notice-close {
+      background-color: var(--button-bg);
+      color: white;
+    }
+
+    .notice-dont-show {
+      background-color: var(--seat-bg);
+      color: var(--text-color);
+    }
+
+    .notice-buttons button:hover {
+      opacity: 0.9;
+      transform: scale(1.05);
     }
   </style>
 </head>
@@ -531,7 +630,7 @@
         <button onclick="changeNickname()">닉네임 변경</button>
       </div>
       <div class="champion-list">
-        <h3>팀 챔피언 리스트</h3>
+        <h3>팀 전용 챔피언 리스트 (클릭하여 교체)</h3>
         <div class="champion-list-items" id="championList"></div>
       </div>
       <div class="teams-container">
@@ -549,6 +648,7 @@
         <button id="resetGameBtn" disabled>게임 초기화</button>
         <button id="resetRoomBtn" disabled>방 초기화</button>
         <button id="rerollBtn" disabled>리롤</button>
+        <button id="randomAssignBtn" disabled>랜덤 배정</button>
       </div>
       <div class="waiting-room">
         <h3>대기실</h3>
@@ -566,6 +666,53 @@
     let gameStarted = false;
     let hasJoined = false;
     let countdownInterval = null; // 카운트다운 타이머를 저장할 전역 변수
+    let isDarkTheme = false;      // 테마 상태 변수
+    
+    // 현재 공지사항 버전 - 업데이트마다 숫자를 올려주세요
+    const NOTICE_VERSION = "1.0";
+
+    // 쿠키 설정 함수
+    function setCookie(name, value, days) {
+      let expires = "";
+      if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+      }
+      document.cookie = name + "=" + value + expires + "; path=/";
+    }
+
+    // 쿠키 가져오기 함수
+    function getCookie(name) {
+      const nameEQ = name + "=";
+      const ca = document.cookie.split(';');
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+      }
+      return null;
+    }
+
+    // 페이지 로드 시 쿠키에서 테마 설정 읽기
+    function loadThemeFromCookie() {
+      const savedTheme = getCookie("darkMode");
+      if (savedTheme === "true") {
+        isDarkTheme = true;
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.getElementById('themeSwitch').textContent = '🌙';
+      } else {
+        isDarkTheme = false;
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.getElementById('themeSwitch').textContent = '🌞';
+      }
+    }
+
+    // 페이지 로드 시 테마 설정 로드
+    document.addEventListener('DOMContentLoaded', () => {
+      loadThemeFromCookie();
+      setTimeout(showNotice, 1000); // 1초 후 공지사항 표시
+    });
 
     // 초기 화면 설정
     socket.on('connect', () => {
@@ -640,9 +787,10 @@
               <div class="player-name ${isCurrentPlayer ? 'self' : ''} ${player.isHost ? 'host' : ''}">
                 ${player.nickname}${player.isHost ? ' 👑' : ''}
               </div>
-              ${(isCurrentPlayer || isSameTeam) && player.champion ? 
-                `<div class="champion-display"><img src="/champions/${player.champion}.png" alt="${player.champion}"></div>` : 
-                player.champion ? `<div class="champion-display unknown">???</div>` : ''}
+              ${player.champion ? 
+                (isCurrentPlayer || isSameTeam ? 
+                `<div class="champion-display"><img src="/champions/${player.champion}.png" alt="${player.champion}" title="${player.champion}"></div>` : 
+                `<div class="champion-display unknown">???</div>`) : ''}
             </div>
           `;
         } else {
@@ -720,17 +868,39 @@
       updateSeats(state.team2, 'team2Seats');
       updateSeats(state.waiting, 'waitingSeats');
       
+      // 같은 팀의 챔피언 리스트 업데이트
+      let myTeam = null;
+      const allPlayers = [...state.team1, ...state.team2, ...state.waiting];
+      const currentPlayer = allPlayers.find(p => p && p.id === socket.id);
+      
+      if (currentPlayer) {
+        myTeam = currentPlayer.team;
+        socket.team = myTeam;
+        
+        // 내 팀이 있고 팀 챔피언 리스트가 존재하면 업데이트
+        if (myTeam && state[`${myTeam}Champions`]) {
+          updateChampionList(state[`${myTeam}Champions`]);
+        }
+      }
+      
       // 호스트인 경우에만 시작 버튼 활성화
       if (isHost) {
         const hasWaitingPlayers = state.waiting.some(p => p !== null);
         document.getElementById('startGameBtn').disabled = hasWaitingPlayers || gameStarted;
         document.getElementById('resetGameBtn').disabled = !gameStarted;
         document.getElementById('resetRoomBtn').disabled = false;
+        
+        // 랜덤 배정 버튼 활성화 조건: 
+        // 1. 대기실에 플레이어가 있고 
+        // 2. 게임이 시작되지 않았으며
+        // 3. 팀1과 팀2에 플레이어가 없어야 함
+        const hasPlayersInWaiting = state.waiting.some(p => p !== null);
+        const hasPlayersInTeam1 = state.team1.some(p => p !== null);
+        const hasPlayersInTeam2 = state.team2.some(p => p !== null);
+        document.getElementById('randomAssignBtn').disabled = !hasPlayersInWaiting || gameStarted || hasPlayersInTeam1 || hasPlayersInTeam2;
       }
 
       // 리롤 버튼 업데이트
-      const allPlayers = [...state.team1, ...state.team2, ...state.waiting];
-      const currentPlayer = allPlayers.find(p => p && p.id === socket.id);
       if (currentPlayer) {
         const rerollBtn = document.getElementById('rerollBtn');
         const rerollCount = currentPlayer.rerollCount !== undefined ? currentPlayer.rerollCount : 2;
@@ -748,6 +918,7 @@
           rerollCountDisplay.className = 'reroll-count-display';
           rerollBtn.parentNode.insertBefore(rerollCountDisplay, rerollBtn.nextSibling);
         }
+        rerollCountDisplay.textContent = ` (${rerollCount}회)`;
       } else {
         // 플레이어가 없는 경우 기본값 표시
         const rerollBtn = document.getElementById('rerollBtn');
@@ -809,33 +980,39 @@
 
     // 게임 시작 버튼
     document.getElementById('startGameBtn').addEventListener('click', () => {
-      socket.emit('start-game');
-      Toastify({
-        text: "게임이 시작되었습니다!",
-        duration: 1500,
-        gravity: "top",
-        position: "center",
-        style: {
-          background: "linear-gradient(to right, #2196F3, #1976D2)",
-          color: "white",
-          fontWeight: "bold",
-          fontSize: "16px",
-          padding: "15px",
-          borderRadius: "5px"
-        }
-      }).showToast();
+      if (isHost) {
+        socket.emit('start-game');
+      }
     });
 
     // 게임 초기화 버튼
     document.getElementById('resetGameBtn').addEventListener('click', () => {
-      socket.emit('reset-game');
+      if (!gameStarted) {
+        Toastify({
+          text: "게임이 시작되지 않았습니다.",
+          duration: 1500,
+          gravity: "top",
+          position: "center",
+          style: {
+            background: "linear-gradient(to right, #ff9800, #f57c00)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "16px",
+            padding: "15px",
+            borderRadius: "5px"
+          }
+        }).showToast();
+        return;
+      }
+      
+      // 승리 팀 선택 대화상자 표시
       Toastify({
-        text: "게임이 초기화되었습니다! 자리를 선택하세요",
-        duration: 1500,
+        text: "승리한 팀을 선택해주세요",
+        duration: 3000,
         gravity: "top",
         position: "center",
         style: {
-          background: "linear-gradient(to right, #ff0000, #d32f2f)",
+          background: "linear-gradient(to right, #4CAF50, #2E7D32)",
           color: "white",
           fontWeight: "bold",
           fontSize: "16px",
@@ -843,6 +1020,95 @@
           borderRadius: "5px"
         }
       }).showToast();
+      
+      // 승리 팀 선택 모달 표시
+      const modal = document.createElement('div');
+      modal.className = 'win-modal';
+      modal.innerHTML = `
+        <div class="win-modal-content">
+          <h3>승리 팀 선택</h3>
+          <p>승리한 팀을 선택하면 패배한 팀에게 리롤 +1이 적립됩니다.</p>
+          <div class="win-team-buttons">
+            <button id="team1Win">팀 1 승리</button>
+            <button id="team2Win">팀 2 승리</button>
+            <button id="noWinner">승자 없음</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      
+      // 모달 스타일
+      const style = document.createElement('style');
+      style.textContent = `
+        .win-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.7);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+        }
+        .win-modal-content {
+          background-color: var(--container-bg);
+          color: var(--text-color);
+          padding: 20px;
+          border-radius: 10px;
+          text-align: center;
+          max-width: 400px;
+          width: 100%;
+        }
+        .win-team-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 20px;
+        }
+        .win-team-buttons button {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: all 0.3s ease;
+        }
+        #team1Win {
+          background-color: var(--team1-border);
+          color: white;
+        }
+        #team2Win {
+          background-color: var(--team2-border);
+          color: white;
+        }
+        #noWinner {
+          background-color: var(--button-bg);
+          color: white;
+        }
+        .win-team-buttons button:hover {
+          opacity: 0.9;
+          transform: scale(1.05);
+        }
+      `;
+      document.head.appendChild(style);
+      
+      // 버튼 이벤트 리스너
+      document.getElementById('team1Win').addEventListener('click', () => {
+        socket.emit('reset-game', { winningTeam: 'team1' });
+        document.body.removeChild(modal);
+      });
+      
+      document.getElementById('team2Win').addEventListener('click', () => {
+        socket.emit('reset-game', { winningTeam: 'team2' });
+        document.body.removeChild(modal);
+      });
+      
+      document.getElementById('noWinner').addEventListener('click', () => {
+        socket.emit('reset-game', { winningTeam: null });
+        document.body.removeChild(modal);
+      });
     });
 
     // 방 초기화 버튼
@@ -916,13 +1182,47 @@
       const championList = document.getElementById('championList');
       championList.innerHTML = '';
       
+      if (!champions || champions.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-champion-list';
+        emptyMessage.textContent = '사용 가능한 챔피언이 없습니다';
+        championList.appendChild(emptyMessage);
+        return;
+      }
+      
       champions.forEach(champion => {
         const championItem = document.createElement('div');
         championItem.className = 'champion-item';
-        championItem.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}">`;
+        championItem.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}" title="${champion}">`;
+        championItem.setAttribute('data-champion', champion);
+        
+        // 클릭 시 스왑 요청
         championItem.addEventListener('click', () => {
+          // 클릭 효과 추가
+          championItem.style.transform = 'scale(0.9)';
+          setTimeout(() => {
+            championItem.style.transform = 'scale(1)';
+          }, 100);
+          
           socket.emit('swap-champion', champion);
+          
+          // 토스트 메시지 표시
+          Toastify({
+            text: `${champion} 챔피언으로 스왑 요청`,
+            duration: 1500,
+            gravity: "bottom",
+            position: "right",
+            style: {
+              background: "linear-gradient(to right, #9C27B0, #673AB7)",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "14px",
+              padding: "12px",
+              borderRadius: "5px"
+            }
+          }).showToast();
         });
+        
         championList.appendChild(championItem);
       });
     }
@@ -1005,12 +1305,14 @@
 
     // 테마 전환 기능
     const themeSwitch = document.getElementById('themeSwitch');
-    let isDarkTheme = false;
 
     function toggleTheme() {
       isDarkTheme = !isDarkTheme;
       document.documentElement.setAttribute('data-theme', isDarkTheme ? 'dark' : 'light');
       themeSwitch.textContent = isDarkTheme ? '🌙' : '🌞';
+      
+      // 쿠키에 테마 설정 저장 (30일 동안 유지)
+      setCookie("darkMode", isDarkTheme.toString(), 30);
       
       // 테마 변경 알림
       Toastify({
@@ -1032,6 +1334,97 @@
     }
 
     themeSwitch.addEventListener('click', toggleTheme);
+
+    // 랜덤 배정 버튼 이벤트 리스너
+    document.getElementById('randomAssignBtn').addEventListener('click', () => {
+      if (isHost) {
+        socket.emit('random-assign-teams');
+        
+        // 알림 메시지 표시
+        Toastify({
+          text: "플레이어들을 랜덤으로 팀에 배정합니다!",
+          duration: 3000,
+          gravity: "top",
+          position: "center",
+          style: {
+            background: "linear-gradient(to right, #8E2DE2, #4A00E0)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "16px",
+            padding: "15px",
+            borderRadius: "5px"
+          }
+        }).showToast();
+      }
+    });
+
+    // 리롤 보너스 알림
+    socket.on('reroll-bonus', (data) => {
+      Toastify({
+        text: data.message + ` (현재: ${data.newCount})`,
+        duration: 3000,
+        gravity: "bottom",
+        position: "right",
+        style: {
+          background: "linear-gradient(to right, #FF9800, #FF5722)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "14px",
+          padding: "12px",
+          borderRadius: "5px"
+        }
+      }).showToast();
+    });
+
+    // 공지사항 표시 함수
+    function showNotice() {
+      // 이미 본 공지사항인지 확인
+      const noticeShown = getCookie("noticeVersion");
+      if (noticeShown === NOTICE_VERSION) {
+        return; // 이미 현재 버전의 공지사항을 봤으면 표시하지 않음
+      }
+
+      // 모달 생성
+      const modal = document.createElement('div');
+      modal.className = 'notice-modal';
+      modal.innerHTML = `
+        <div class="notice-modal-content">
+          <div class="notice-title">업데이트 안내</div>
+          <div class="notice-content">
+            <div class="notice-update-item">
+              <b>랜덤 배정 기능 추가</b>: 호스트는 이제 대기실의 플레이어들을 랜덤으로 두 팀에 배정할 수 있습니다. (팀에 이미 플레이어가 있으면 비활성화됩니다)
+            </div>
+            <div class="notice-update-item">
+              <b>승리/패배 팀 선택</b>: 게임 종료 후 호스트가 승리 팀을 선택하면 패배 팀은 리롤 횟수 +1을 보상으로 받습니다.
+            </div>
+            <div class="notice-update-item">
+              <b>리롤 시스템 개선</b>: 리롤 횟수가 이제 게임 간에 유지됩니다. 새 플레이어는 기본 2회의 리롤을 갖습니다.
+            </div>
+            <div class="notice-update-item">
+              <b>다크 모드 설정 저장</b>: 테마 설정이 이제 쿠키에 저장되어 브라우저를 닫았다가 다시 열어도 설정이 유지됩니다.
+            </div>
+            <div class="notice-update-item">
+              <b>UI 개선</b>: 팀 챔피언 리스트 표시 및 다양한 사용자 경험 개선이 추가되었습니다.
+            </div>
+          </div>
+          <div class="notice-buttons">
+            <button class="notice-dont-show">다시 보지 않기</button>
+            <button class="notice-close">닫기</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      // 이벤트 리스너 추가
+      modal.querySelector('.notice-close').addEventListener('click', () => {
+        document.body.removeChild(modal);
+      });
+
+      modal.querySelector('.notice-dont-show').addEventListener('click', () => {
+        setCookie("noticeVersion", NOTICE_VERSION, 90); // 90일 동안 저장
+        document.body.removeChild(modal);
+      });
+    }
   </script>
 </body>
 </html>

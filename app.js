@@ -301,7 +301,7 @@ io.on('connection', (socket) => {
     team1Players.forEach(player => {
       if (player) {
         player.champion = getRandomChampion(team1Players, room.gameState.team1Champions);
-        player.rerollCount = 2;
+        // 리롤 횟수는 초기화하지 않음
       }
     });
 
@@ -309,7 +309,7 @@ io.on('connection', (socket) => {
     team2Players.forEach(player => {
       if (player) {
         player.champion = getRandomChampion(team2Players, room.gameState.team2Champions);
-        player.rerollCount = 2;
+        // 리롤 횟수는 초기화하지 않음
       }
     });
 
@@ -317,7 +317,7 @@ io.on('connection', (socket) => {
     waitingPlayers.forEach(player => {
       if (player) {
         player.champion = getRandomChampion(waitingPlayers, []);
-        player.rerollCount = 2;
+        // 리롤 횟수는 초기화하지 않음
       }
     });
     
@@ -330,22 +330,75 @@ io.on('connection', (socket) => {
       io.to(room.id).emit('countdown-finished');
     }, countdownDuration * 1000);
     
-    io.to(room.id).emit('game-state', {
-      team1: room.gameState.team1,
-      team2: room.gameState.team2,
-      waiting: room.gameState.waiting
-    });
+    // 게임 상태 전체 정보 전송 (팀 챔피언 리스트 포함)
+    io.to(room.id).emit('game-state', room.gameState);
   });
 
-  // 게임 초기화
-  socket.on('reset-game', () => {
+  // 랜덤 팀 배정
+  socket.on('random-assign-teams', () => {
     const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
     if (!room || socket.id !== room.gameState.host) return;
 
-    // 모든 플레이어의 챔피언과 리롤 횟수 초기화
+    // 대기실에 있는 플레이어들 가져오기
+    const waitingPlayers = room.gameState.waiting.filter(p => p !== null);
+    if (waitingPlayers.length === 0) return;
+
+    // 팀1과 팀2 초기화
+    room.gameState.team1 = Array(5).fill(null);
+    room.gameState.team2 = Array(5).fill(null);
+
+    // 랜덤하게 플레이어 섞기
+    const shuffledPlayers = [...waitingPlayers].sort(() => Math.random() - 0.5);
+
+    // 플레이어를 팀1과 팀2에 배정 (각 팀 최대 5명)
+    const team1Count = Math.min(5, Math.floor(shuffledPlayers.length / 2));
+    const team2Count = Math.min(5, shuffledPlayers.length - team1Count);
+
+    // 팀1에 배정
+    for (let i = 0; i < team1Count; i++) {
+      const player = shuffledPlayers[i];
+      room.gameState.team1[i] = player;
+      player.team = 'team1';
+      player.index = i;
+    }
+
+    // 팀2에 배정
+    for (let i = 0; i < team2Count; i++) {
+      const player = shuffledPlayers[team1Count + i];
+      room.gameState.team2[i] = player;
+      player.team = 'team2';
+      player.index = i;
+    }
+
+    // 대기실 비우기
+    room.gameState.waiting = Array(10).fill(null);
+
+    // 게임 상태 업데이트
+    io.to(room.id).emit('game-state', room.gameState);
+  });
+
+  // 게임 초기화
+  socket.on('reset-game', ({ winningTeam }) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room || socket.id !== room.gameState.host) return;
+
+    // 모든 플레이어의 챔피언만 초기화 (리롤 횟수는 유지)
     room.gameState.players.forEach(player => {
       player.champion = null;
-      player.rerollCount = 2;
+      
+      // 패배한 팀에게 리롤 횟수 1회 추가
+      if (winningTeam && player.team && player.team !== winningTeam) {
+        player.rerollCount = (player.rerollCount || 0) + 1;
+        
+        // 리롤 횟수 추가 알림 전송
+        const playerSocket = io.sockets.sockets.get(player.id);
+        if (playerSocket) {
+          playerSocket.emit('reroll-bonus', {
+            message: '패배 보상: 리롤 횟수 +1',
+            newCount: player.rerollCount
+          });
+        }
+      }
     });
 
     // 챔피언 리스트 초기화
@@ -373,11 +426,8 @@ io.on('connection', (socket) => {
     // 모든 플레이어에게 챔피언 리스트 초기화 이벤트 전송
     io.to(room.id).emit('champion-list-update', []);
 
-    io.to(room.id).emit('game-state', {
-      team1: room.gameState.team1,
-      team2: room.gameState.team2,
-      waiting: room.gameState.waiting
-    });
+    // 게임 상태 전체 정보 전송
+    io.to(room.id).emit('game-state', room.gameState);
   });
 
   // 리롤 요청
@@ -433,11 +483,8 @@ io.on('connection', (socket) => {
           });
         }
         
-        io.to(room.id).emit('game-state', {
-          team1: room.gameState.team1,
-          team2: room.gameState.team2,
-          waiting: room.gameState.waiting
-        });
+        // 게임 상태 전체 정보 전송
+        io.to(room.id).emit('game-state', room.gameState);
       }
     }
   });
@@ -489,11 +536,7 @@ io.on('connection', (socket) => {
     }
 
     // 게임 상태 업데이트
-    io.to(room.id).emit('game-state', {
-      team1: room.gameState.team1,
-      team2: room.gameState.team2,
-      waiting: room.gameState.waiting
-    });
+    io.to(room.id).emit('game-state', room.gameState);
   });
 
   // 연결 해제
@@ -1114,7 +1157,7 @@ app.post('/api/comments', express.json(), async (req, res) => {
 
         res.status(201).json({
           id: this.lastID,
-          message: '댓글이 작성되었어요! ��'
+          message: '댓글이 작성되었어요! ✨'
         });
       }
     );
