@@ -27,7 +27,21 @@ const gameState = {
   host: null,
   team1Champions: [], // 팀1의 챔피언 리스트
   team2Champions: [], // 팀2의 챔피언 리스트
+  bannedChampions: [], // 밴된 챔피언 목록
   usedPlayerNumbers: new Set() // 사용된 플레이어 번호 추적
+};
+
+// 게임 모드
+const GameMode = {
+  NORMAL: 'normal',
+  BAN: 'ban'
+};
+
+// 게임 단계
+const GamePhase = {
+  IDLE: 'idle',
+  BAN: 'ban',
+  PLAY: 'play'
 };
 
 // 방 관리
@@ -55,17 +69,17 @@ const champions = [
 ];
 
 // 랜덤 챔피언 선택 함수
-function getRandomChampion(teamPlayers, teamChampions) {
-  // 현재 팀에서 이미 선택된 챔피언 목록
+function getRandomChampion(teamPlayers, excludeChampions) {
+  // 현재 팀에서 이미 선택된 챔피언 목록과 추가로 제외할 챔피언들
   const usedChampions = teamPlayers
     .filter(p => p && p.champion)
     .map(p => p.champion);
 
-  // 팀 챔피언 리스트에 있는 챔피언들도 제외
-  const excludedChampions = [...usedChampions, ...teamChampions];
+  // 모든 제외 챔피언들
+  const allExcludedChampions = [...usedChampions, ...excludeChampions];
 
-  // 사용 가능한 챔피언 목록 (이미 선택된 챔피언과 팀 챔피언 리스트 제외)
-  const availableChampions = champions.filter(c => !excludedChampions.includes(c));
+  // 사용 가능한 챔피언 목록 
+  const availableChampions = champions.filter(c => !allExcludedChampions.includes(c));
 
   if (availableChampions.length === 0) {
     return null; // 사용 가능한 챔피언이 없는 경우
@@ -313,8 +327,12 @@ io.on('connection', (socket) => {
         host: socket.id,
         team1Champions: [],
         team2Champions: [],
-        usedPlayerNumbers: new Set()
-      }
+        bannedChampions: [], // 빈 밴 챔피언 목록 추가
+        usedPlayerNumbers: new Set(),
+        mode: GameMode.NORMAL, // 기본 게임 모드
+        phase: GamePhase.IDLE  // 기본 게임 단계
+      },
+      banTimer: null // 밴 단계 타이머
     };
 
     // 호스트를 첫 번째 플레이어로 추가
@@ -511,6 +529,16 @@ io.on('connection', (socket) => {
       player.team = team;
       player.index = index;
       
+      // 애니메이션을 위한 플래그 추가
+      player.justMoved = true;
+      
+      // 다음 상태 업데이트에서 플래그를 제거하기 위해 타이머 설정
+      setTimeout(() => {
+        if (player && room.gameState.players.has(socket.id)) {
+          player.justMoved = false;
+        }
+      }, 1000);
+      
       // 대기실에서 제거 (팀1이나 팀2로 이동할 때만)
       if (player.team !== 'waiting' && player.team === 'waiting') {
         room.gameState.waiting[player.index] = null;
@@ -521,13 +549,186 @@ io.on('connection', (socket) => {
   });
 
   // 게임 시작
-  socket.on('start-game', () => {
+  socket.on('start-game', (options = {}) => {
     const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
     if (!room || socket.id !== room.gameState.host) return;
 
     // 대기실에 사람이 있으면 시작 불가
     if (room.gameState.waiting.some(p => p)) return;
 
+    const gameMode = options.mode || GameMode.NORMAL;
+    room.gameState.mode = gameMode;
+    
+    if (gameMode === GameMode.BAN) {
+      // 밴 모드인 경우 밴 단계 시작
+      startBanPhase(room);
+    } else {
+      // 일반 모드인 경우 바로 게임 시작
+      startGame(room);
+    }
+  });
+
+  // 밴 단계 시작
+  function startBanPhase(room) {
+    // 게임 단계를 밴으로 변경
+    room.gameState.phase = GamePhase.BAN;
+    
+    // 각 팀 플레이어들의 밴 상태 초기화
+    room.gameState.playerBanStatus = {};
+    
+    // 팀별 플레이어 목록
+    const team1Players = room.gameState.team1.filter(p => p !== null);
+    const team2Players = room.gameState.team2.filter(p => p !== null);
+    
+    // 팀 플레이어들의 밴 상태 초기화
+    [...team1Players, ...team2Players].forEach(player => {
+      room.gameState.playerBanStatus[player.id] = {
+        nickname: player.nickname,
+        team: player.team,
+        completed: false,
+        selectingChampion: null
+      };
+    });
+    
+    // 밴 단계 시작 이벤트 전송
+    io.to(room.id).emit('start-ban-phase', {
+      players: room.gameState.playerBanStatus,
+      state: {
+        team1: room.gameState.team1,
+        team2: room.gameState.team2,
+        waiting: room.gameState.waiting
+      }
+    });
+    
+    // 밴 시간 제한 설정 (90초)
+    room.banTimer = setTimeout(() => {
+      // 시간 초과시 밴하지 않은a 플레이어들은 자동으로 랜덤 챔피언 밴
+      autoCompleteBans(room);
+    }, 90000);
+  }
+
+  // 자동 밴 처리 함수
+  function autoCompleteBans(room) {
+    // 아직 밴을 선택하지 않은 플레이어 찾기
+    const pendingPlayers = Object.entries(room.gameState.playerBanStatus)
+      .filter(([playerId, status]) => !status.completed)
+      .map(([playerId, status]) => playerId);
+    
+    console.log(`밴 시간 초과: ${pendingPlayers.length}명의 플레이어가 자동 밴 처리됩니다.`);
+    
+    if (pendingPlayers.length === 0) {
+      // 모든 플레이어가 이미 밴을 완료했다면 밴 단계 종료
+      completeBanPhase(room);
+      return;
+    }
+    
+    // 각 팀별로 이미 밴된 챔피언 목록
+    const team1BannedChampions = [];
+    const team2BannedChampions = [];
+    
+    Object.values(room.gameState.playerBanStatus).forEach(status => {
+      if (status.champion) {
+        if (status.team === 'team1') {
+          team1BannedChampions.push(status.champion);
+        } else if (status.team === 'team2') {
+          team2BannedChampions.push(status.champion);
+        }
+      }
+    });
+    
+    // 아직 밴을 선택하지 않은 플레이어들에게 자동 밴 처리
+    pendingPlayers.forEach(playerId => {
+      const playerStatus = room.gameState.playerBanStatus[playerId];
+      const playerTeam = playerStatus.team;
+      
+      // 이미 해당 팀이 밴한 챔피언을 제외한 목록
+      const teamBannedChampions = playerTeam === 'team1' ? team1BannedChampions : team2BannedChampions;
+      const availableChampions = champions.filter(c => !teamBannedChampions.includes(c));
+      
+      if (availableChampions.length > 0) {
+        // 랜덤 챔피언 선택
+        const randomIndex = Math.floor(Math.random() * availableChampions.length);
+        const selectedChampion = availableChampions[randomIndex];
+        
+        // 밴 상태 업데이트
+        playerStatus.champion = selectedChampion;
+        playerStatus.completed = true;
+        
+        // 팀별 밴 목록에 추가
+        if (playerTeam === 'team1') {
+          team1BannedChampions.push(selectedChampion);
+        } else if (playerTeam === 'team2') {
+          team2BannedChampions.push(selectedChampion);
+        }
+        
+        // 자동 밴 이벤트 전송
+        io.to(room.id).emit('ban-confirmed', {
+          playerId: playerId,
+          champion: selectedChampion,
+          team: playerTeam,
+          auto: true
+        });
+        
+        console.log(`자동 밴 처리: ${playerStatus.nickname}(${playerTeam})이(가) ${selectedChampion}을(를) 밴했습니다.`);
+      }
+    });
+    
+    // 모든 자동 밴 처리 후 밴 단계 종료
+    completeBanPhase(room);
+  }
+
+  // 밴 단계 완료
+  function completeBanPhase(room) {
+    // 밴 타이머 제거
+    if (room.banTimer) {
+      clearTimeout(room.banTimer);
+      room.banTimer = null;
+    }
+    
+    // 게임 단계를 플레이로 변경
+    room.gameState.phase = GamePhase.PLAY;
+    
+    // 팀별 플레이어 목록
+    const team1Players = room.gameState.team1.filter(p => p !== null);
+    const team2Players = room.gameState.team2.filter(p => p !== null);
+    
+    // 팀별 밴 챔피언 목록
+    const team1Bans = [];
+    const team2Bans = [];
+    const allBannedChampions = [];
+    
+    // 플레이어 밴 상태에서 밴 챔피언 수집
+    Object.values(room.gameState.playerBanStatus).forEach(player => {
+      if (player.champion) {
+        allBannedChampions.push(player.champion);
+        
+        if (player.team === 'team1') {
+          team1Bans.push(player.champion);
+        } else if (player.team === 'team2') {
+          team2Bans.push(player.champion);
+        }
+      }
+    });
+    
+    // 밴 목록 저장
+    room.gameState.bannedChampions = allBannedChampions;
+    
+    // 밴 단계 완료 이벤트 전송
+    io.to(room.id).emit('ban-phase-complete', {
+      team1Bans,
+      team2Bans,
+      allBannedChampions
+    });
+    
+    // 게임 시작
+    startGame(room);
+  }
+
+  // 게임 시작 (플레이 단계)
+  function startGame(room) {
+    // 게임 단계를 플레이로 설정
+    room.gameState.phase = GamePhase.PLAY;
+    
     // 팀별로 챔피언 할당
     const team1Players = room.gameState.team1.filter(p => p !== null);
     const team2Players = room.gameState.team2.filter(p => p !== null);
@@ -536,7 +737,7 @@ io.on('connection', (socket) => {
     // 팀1 챔피언 할당
     team1Players.forEach(player => {
       if (player) {
-        player.champion = getRandomChampion(team1Players, room.gameState.team1Champions);
+        player.champion = getRandomChampion(team1Players, [...room.gameState.team1Champions, ...room.gameState.bannedChampions]);
         // 리롤 횟수는 초기화하지 않음
       }
     });
@@ -544,7 +745,7 @@ io.on('connection', (socket) => {
     // 팀2 챔피언 할당
     team2Players.forEach(player => {
       if (player) {
-        player.champion = getRandomChampion(team2Players, room.gameState.team2Champions);
+        player.champion = getRandomChampion(team2Players, [...room.gameState.team2Champions, ...room.gameState.bannedChampions]);
         // 리롤 횟수는 초기화하지 않음
       }
     });
@@ -552,13 +753,13 @@ io.on('connection', (socket) => {
     // 대기실 플레이어 챔피언 할당
     waitingPlayers.forEach(player => {
       if (player) {
-        player.champion = getRandomChampion(waitingPlayers, []);
+        player.champion = getRandomChampion(waitingPlayers, [...room.gameState.bannedChampions]);
         // 리롤 횟수는 초기화하지 않음
       }
     });
     
     // 카운트다운 시작
-    const countdownDuration = 120; // 3분
+    const countdownDuration = 120; // 2분
     io.to(room.id).emit('start-countdown', countdownDuration);
     
     // 카운트다운이 끝나면 스왑과 리롤 기능 비활성화
@@ -568,7 +769,7 @@ io.on('connection', (socket) => {
     
     // 게임 상태 전체 정보 전송 (팀 챔피언 리스트 포함)
     io.to(room.id).emit('game-state', room.gameState);
-  });
+  }
 
   // 랜덤 팀 배정
   socket.on('random-assign-teams', () => {
@@ -655,6 +856,15 @@ io.on('connection', (socket) => {
     // 챔피언 리스트 초기화
     room.gameState.team1Champions = [];
     room.gameState.team2Champions = [];
+    room.gameState.bannedChampions = []; // 밴 챔피언 목록도 초기화
+    room.gameState.playerBanStatus = {}; // 플레이어 밴 상태 초기화
+    room.gameState.phase = GamePhase.IDLE; // 게임 단계 초기화
+    
+    // 밴 타이머가 있다면 정지
+    if (room.banTimer) {
+      clearTimeout(room.banTimer);
+      room.banTimer = null;
+    }
 
     // 모든 플레이어를 대기실로 이동
     let waitingIndex = 0;
@@ -699,7 +909,8 @@ io.on('connection', (socket) => {
                            currentPlayer.team === 'team2' ? room.gameState.team2Champions :
                            [];
       
-      const newChampion = getRandomChampion(teamPlayers, teamChampions);
+      // 밴된 챔피언도 제외하고 새로운 챔피언 할당
+      const newChampion = getRandomChampion(teamPlayers, [...teamChampions, ...room.gameState.bannedChampions]);
       if (newChampion) {
         // 기존 챔피언을 팀 챔피언 리스트에 추가
         if (currentPlayer.champion) {
@@ -870,6 +1081,144 @@ io.on('connection', (socket) => {
     }));
     io.emit('room-list', roomList);
   }
+
+  // 챔피언 밴 요청 처리
+  socket.on('ban-champion', (data) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    // 밴 단계가 아니면 무시
+    if (room.gameState.phase !== GamePhase.BAN) return;
+
+    // 플레이어가 팀에 속해있는지 확인
+    const player = room.gameState.players.get(socket.id);
+    if (!player || (player.team !== 'team1' && player.team !== 'team2')) return;
+
+    // 이미 밴을 완료한 플레이어인지 확인
+    if (room.gameState.playerBanStatus[socket.id] && room.gameState.playerBanStatus[socket.id].completed) return;
+
+    const championName = data.champion;
+    const isAuto = data.auto || false;
+
+    // 유효한 챔피언인지 확인
+    if (!champions.includes(championName)) return;
+
+    // 같은 팀이 이미 밴한 챔피언인지 확인
+    const isBannedByTeam = Object.values(room.gameState.playerBanStatus)
+      .some(p => p.team === player.team && p.champion === championName);
+    
+    if (isBannedByTeam) {
+      // 같은 팀이 이미 밴한 챔피언인 경우 다른 챔피언을 선택하도록 함
+      if (isAuto) {
+        // 사용 가능한 챔피언 중에서 랜덤 선택
+        // 이미 같은 팀이 밴한 챔피언은 제외
+        const teamBannedChampions = Object.values(room.gameState.playerBanStatus)
+          .filter(p => p.team === player.team && p.champion)
+          .map(p => p.champion);
+        
+        const availableChampions = champions.filter(c => !teamBannedChampions.includes(c));
+        
+        if (availableChampions.length > 0) {
+          const randomIndex = Math.floor(Math.random() * availableChampions.length);
+          const newChampion = availableChampions[randomIndex];
+          
+          room.gameState.playerBanStatus[socket.id].champion = newChampion;
+          room.gameState.playerBanStatus[socket.id].completed = true;
+          
+          // 자동 밴에 대한 밴 확정 이벤트 전송
+          io.to(room.id).emit('ban-confirmed', {
+            playerId: socket.id,
+            champion: newChampion,
+            team: player.team,
+            auto: true
+          });
+        }
+      }
+      return;
+    }
+
+    // 플레이어 밴 상태 업데이트
+    room.gameState.playerBanStatus[socket.id].champion = championName;
+    room.gameState.playerBanStatus[socket.id].completed = true;
+
+    // 모든 플레이어에게 밴 상태 업데이트 전송
+    io.to(room.id).emit('player-ban-status', room.gameState.playerBanStatus);
+
+    // 밴 확정 이벤트 전송 (UI 업데이트를 위해)
+    io.to(room.id).emit('ban-confirmed', {
+      playerId: socket.id,
+      champion: championName,
+      team: player.team
+    });
+
+    // 모든 플레이어가 밴을 완료했는지 확인
+    const allCompleted = Object.values(room.gameState.playerBanStatus)
+                              .every(p => p.completed);
+    
+    if (allCompleted) {
+      // 모든 플레이어가 밴을 완료했으면 밴 단계 종료 및 게임 시작
+      completeBanPhase(room);
+    }
+  });
+
+  // 플레이어 선택 중인 챔피언 업데이트 처리
+  socket.on('selecting-ban-champion', (championName) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    // 밴 단계가 아니면 무시
+    if (room.gameState.phase !== GamePhase.BAN) return;
+
+    // 플레이어가 팀에 속해있는지 확인
+    const player = room.gameState.players.get(socket.id);
+    if (!player || (player.team !== 'team1' && player.team !== 'team2')) return;
+
+    // 이미 밴을 완료한 플레이어인지 확인
+    if (room.gameState.playerBanStatus[socket.id] && room.gameState.playerBanStatus[socket.id].completed) return;
+
+    // 플레이어가 선택 중인 챔피언 업데이트
+    if (!room.gameState.playerBanStatus[socket.id]) {
+      room.gameState.playerBanStatus[socket.id] = {
+        nickname: player.nickname,
+        team: player.team,
+        completed: false
+      };
+    }
+
+    // 선택 중인 챔피언 설정 (null이면 선택 취소)
+    room.gameState.playerBanStatus[socket.id].selectingChampion = championName;
+
+    // 모든 플레이어에게 선택 중인 챔피언 정보 전송
+    io.to(room.id).emit('player-selecting-champion', {
+      playerId: socket.id,
+      champion: championName
+    });
+  });
+
+  // 챔피언 밴 해제 요청 처리
+  socket.on('unban-champion', (championName) => {
+    const room = Array.from(rooms.values()).find(r => r.players.includes(socket.id));
+    if (!room) return;
+
+    // 게임이 시작되었으면 밴 해제 불가
+    if ([...room.gameState.team1, ...room.gameState.team2].some(p => p && p.champion)) {
+      return;
+    }
+
+    // 호스트만 밴 해제 가능
+    if (socket.id !== room.gameState.host) {
+      return;
+    }
+
+    // 밴 리스트에서 제거
+    const index = room.gameState.bannedChampions.indexOf(championName);
+    if (index !== -1) {
+      room.gameState.bannedChampions.splice(index, 1);
+    }
+
+    // 게임 상태 업데이트
+    io.to(room.id).emit('game-state', room.gameState);
+  });
 });
 
 // 데이터베이스 설정

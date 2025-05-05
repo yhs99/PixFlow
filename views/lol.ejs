@@ -64,7 +64,7 @@
     }
 
     .container { 
-      max-width: 800px; 
+      max-width: 1000px; 
       margin: 20px auto; 
       padding: 20px;
       background-color: var(--container-bg);
@@ -212,23 +212,74 @@
       display: flex; 
       justify-content: space-between; 
       margin: 20px 0;
-      gap: 40px;
+      gap: 20px;
+      flex-wrap: wrap;
     }
     .team { 
-      width: 48%; 
+      width: 30%; 
       padding: 10px; 
       border: 1px solid #ccc; 
       border-radius: 5px;
       flex: 1;
+      min-width: 200px;
     }
+    
+    /* 밴 챔피언 섹션이 숨겨졌을 때 팀 섹션 스타일 */
+    .teams-container.no-ban .team {
+      width: 45%;
+      flex: 0 0 45%;
+    }
+    
     .team h3 {
       text-align: left;
     }
     .team:nth-child(2) h3 {
       text-align: right;
     }
-    .waiting-room { 
+    .team-ban-slots {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 5px;
+    }
+    .ban-slot {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      border: 2px solid #f44336;
+      background-color: var(--seat-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .ban-slot img {
       width: 100%; 
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.7;
+    }
+    .ban-slot.empty {
+      position: relative;
+    }
+    .ban-slot.empty::after {
+      content: "";
+      position: absolute;
+      width: 70%;
+      height: 2px;
+      background-color: #f44336;
+      transform: rotate(45deg);
+    }
+    .ban-slot.empty::before {
+      content: "";
+      position: absolute;
+      width: 70%;
+      height: 2px;
+      background-color: #f44336;
+      transform: rotate(-45deg);
+    }
+    .waiting-room { 
+      width: 99%; 
       padding: 10px; 
       border: 1px solid #ccc; 
       border-radius: 5px; 
@@ -293,7 +344,6 @@
     .seat .player-name.host {
       color: #ff0000; /* 빨간색 */
       font-weight: bold;
-      text-decoration: underline;
     }
     .seat .champion-display { 
       font-weight: bold; 
@@ -445,6 +495,53 @@
       color: #ff0000;
       margin: 10px 0;
     }
+
+    /* 수정: game-status를 상단에 고정 */
+    .fixed-game-status {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: var(--game-status-bg);
+      border-bottom: 1px solid var(--border-color);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 10px;
+      text-align: center;
+      transition: all 0.3s ease;
+      width: 100%;
+      max-width: 1020px;
+      margin: 0 auto;
+    }
+
+    /* 다크 모드에서의 고정 상태바 스타일 */
+    [data-theme="dark"] .fixed-game-status {
+      background: var(--container-bg);
+      border-color: var(--border-color);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    /* 고정 상태바가 적용될 때 콘텐츠 여백 */
+    .status-padding {
+      padding-top: 70px;
+    }
+    
+    /* 모바일 화면에서의 고정 상태바 스타일 */
+    @media (max-width: 768px) {
+      .fixed-game-status {
+        padding: 5px;
+        font-size: 0.9em;
+      }
+      
+      .fixed-game-status h2 {
+        font-size: 1em;
+      }
+      
+      .status-padding {
+        padding-top: 60px;
+      }
+    }
+
     .nickname-form {
       text-align: center;
       margin-bottom: 20px;
@@ -658,20 +755,405 @@
       flex-direction: column;
       align-items: center;
     }
+
+    .banned-champions {
+      width: 30%;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 5px;
+      flex: 1;
+      min-width: 200px;
+      background: var(--container-bg);
+      transition: all 0.3s ease;
+    }
+    
+    .banned-champions.ban-mode {
+      width: 90%;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .banned-champions h3 {
+      text-align: center;
+      margin-top: 0;
+      color: var(--text-color);
+    }
+    
+    .banned-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+      gap: 10px;
+      padding: 5px;
+      min-height: 60px;
+    }
+    
+    .ban-timer-display {
+      font-size: 24px;
+      font-weight: bold;
+      color: #f44336;
+      text-align: center;
+      margin: 10px 0;
+      display: none;
+    }
+    
+    .ban-phase-controls {
+      display: none;
+      margin-top: 15px;
+    }
+    
+    .ban-confirm-btn {
+      padding: 10px 20px;
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      display: block;
+      margin: 10px auto;
+      transition: all 0.3s ease;
+    }
+    
+    .ban-confirm-btn:hover {
+      background-color: #d32f2f;
+    }
+    
+    .ban-confirm-btn:disabled {
+      background-color: var(--button-disabled-bg);
+      cursor: not-allowed;
+    }
+    
+    .champion-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 5px;
+    }
+    
+    .champion-item {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid var(--border-color);
+      transition: all 0.3s ease;
+      margin: 0 auto;
+      position: relative;
+    }
+    
+    .champion-item:hover {
+      transform: scale(1.1);
+      border-color: #f44336;
+    }
+    
+    .champion-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .champion-item.banned {
+      opacity: 0.5;
+      position: relative;
+    }
+    
+    .champion-item.banned::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(45deg, transparent 45%, #f44336 45%, #f44336 55%, transparent 55%);
+    }
+    
+    .champion-item.selected {
+      border-color: #f44336;
+      border-width: 3px;
+      transform: scale(1.1);
+    }
+    
+    .ban-search-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 5px;
+      background: var(--input-bg);
+      color: var(--text-color);
+      margin-bottom: 10px;
+    }
+    
+    .player-ban-status {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 10px 0;
+      display: none;
+    }
+    
+    .player-ban-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-radius: 15px;
+      background-color: var(--seat-bg);
+      font-size: 12px;
+    }
+    
+    .player-ban-item.completed {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    .player-ban-item.pending {
+      background-color: #ff9800;
+      color: white;
+    }
+    
+    .player-ban-image {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    
+    .player-ban-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .banned-champion {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 2px solid #f44336;
+      margin: 0 auto;
+      position: relative;
+    }
+    .banned-champion img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.7;
+    }
+    .banned-champion::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(45deg, transparent 45%, #f44336 45%, #f44336 55%, transparent 55%);
+    }
+    /* 게임 모드 선택 모달 */
+    .mode-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--modal-bg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .mode-modal-content {
+      background-color: var(--modal-content-bg);
+      color: var(--text-color);
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      max-width: 500px;
+      width: 90%;
+    }
+    .mode-title {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: var(--button-bg);
+    }
+    .mode-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .mode-btn {
+      padding: 15px 25px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+    .mode-btn:hover {
+      transform: scale(1.05);
+    }
+    .normal-mode-btn {
+      background-color: var(--button-bg);
+      color: white;
+    }
+    .ban-mode-btn {
+      background-color: #f44336;
+      color: white;
+    }
+
+    .ban-team-header {
+      font-weight: bold;
+      font-size: 16px;
+      margin: 15px 0 8px 0;
+      padding: 5px;
+      background-color: var(--team1-border);
+      color: white;
+      border-radius: 5px;
+      text-align: center;
+    }
+    
+    .ban-team-header.enemy {
+      background-color: var(--team2-border);
+    }
+    
+    .player-ban-status {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    
+    .player-ban-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background-color: var(--seat-bg);
+      border-left: 4px solid transparent;
+    }
+    
+    .player-ban-item.completed {
+      background-color: var(--seat-taken-bg);
+      border-left: 4px solid #4CAF50;
+    }
+    
+    .player-ban-item.selecting {
+      background-color: var(--seat-bg);
+      border-left: 4px solid #ff9800;
+      animation: pulse 1.5s infinite;
+    }
+    
+    .player-ban-item.enemy {
+      border-left: 4px solid var(--team2-border);
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
+    
+    .selecting-status {
+      font-style: italic;
+      color: #ff9800;
+      font-size: 14px;
+    }
+    
+    .empty-enemy-ban {
+      padding: 10px;
+      text-align: center;
+      font-style: italic;
+      color: var(--text-color);
+      opacity: 0.7;
+    }
+    
+    .player-ban-image {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 2px solid #f44336;
+    }
+
+    /* 팀원이 선택 중인 챔피언을 표시하는 스타일 */
+    .champion-item.selected-by-team {
+      border: 2px dotted #ffcc00;
+      opacity: 0.8;
+      position: relative;
+    }
+    
+    .champion-item.selected-by-team::before {
+      content: '팀원 선택 중';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background-color: rgba(255, 204, 0, 0.7);
+      color: #000;
+      font-size: 10px;
+      text-align: center;
+      padding: 2px 0;
+    }
+
+    /* 밴 단계에서 상대팀의 밴 슬롯 숨기기 - 더 명확한 선택자 사용 */
+    .ban-mode .team:not(.my-team) .team-ban-slots .ban-slot {
+      background-color: rgba(80, 80, 80, 0.3);
+      position: relative;
+    }
+    
+    .ban-mode .team:not(.my-team) .team-ban-slots .ban-slot img {
+      display: none;
+    }
+    
+    .ban-mode .team:not(.my-team) .team-ban-slots .ban-slot:not(.empty)::after {
+      content: '?';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 20px;
+      color: #888;
+      font-weight: bold;
+    }
+
+    /* 자리 이동 애니메이션 */
+    @keyframes seatMove {
+      0% { 
+        transform: scale(0.8);
+        opacity: 0.5;
+      }
+      50% {
+        transform: scale(1.1);
+        background-color: rgba(74, 220, 162, 0.6);
+      }
+      100% { 
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .seat.moving {
+      animation: seatMove 0.8s ease-in-out;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <button class="theme-switch" id="themeSwitch">🌞</button>
     <div id="gameRoom" style="display: none;">
-      <div class="game-status">
+      <div class="game-status" id="gameStatus">
         <h2 id="gameStatusMessage">게임이 시작되지 않았습니다. 팀을 선택해주세요.</h2>
         <div id="countdown" class="countdown" style="display: none;"></div>
       </div>
-      <div class="nickname-form">
-        <input type="text" id="nicknameInput" placeholder="변경할 닉네임 입력">
-        <button onclick="changeNickname()">닉네임 변경</button>
-      </div>
+      <div class="content-wrapper" id="contentWrapper">
       <div class="champion-list">
         <h3>팀 전용 챔피언 리스트 (클릭하여 교체)</h3>
         <div class="champion-list-items" id="championList"></div>
@@ -679,10 +1161,37 @@
       <div class="teams-container">
         <div class="team">
           <h3>팀 1</h3>
+            <div class="team-ban-slots">
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+            </div>
           <div id="team1Seats"></div>
         </div>
+          
+          <div class="banned-champions" id="bannedChampionsSection">
+            <h3 id="bannedChampionsTitle">밴 챔피언</h3>
+            <div id="banTimerDisplay" class="ban-timer-display"></div>
+            <div id="playerBanStatus" class="player-ban-status"></div>
+            <div id="banPhaseControls" class="ban-phase-controls">
+              <input type="text" id="banSearchInput" class="ban-search-input" placeholder="챔피언 이름 검색...">
+              <div id="championGrid" class="champion-grid"></div>
+              <button id="banConfirmBtn" class="ban-confirm-btn" disabled>밴 확정</button>
+            </div>
+            <div id="bannedChampions" class="banned-list"></div>
+          </div>
+          
         <div class="team">
           <h3>팀 2</h3>
+            <div class="team-ban-slots">
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+              <div class="ban-slot empty"></div>
+            </div>
           <div id="team2Seats"></div>
         </div>
       </div>
@@ -696,12 +1205,220 @@
       <div class="waiting-room">
         <h3>대기실</h3>
         <div id="waitingSeats"></div>
+        </div>
+        <!-- 닉네임 변경 폼을 대기실 아래로 이동 -->
+        <div class="nickname-form">
+          <input type="text" id="nicknameInput" placeholder="변경할 닉네임 입력">
+          <button onclick="changeNickname()">닉네임 변경</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 게임 모드 선택 모달 -->
+  <div id="modeSelectModal" class="mode-modal" style="display: none;">
+    <div class="mode-modal-content">
+      <div class="mode-title">게임 모드를 선택해주세요</div>
+      <div class="mode-description">
+        <p><b>일반 모드:</b> 기존 방식으로 게임이 진행됩니다.</p>
+        <p><b>밴 모드:</b> 게임 시작 전 각 플레이어가 챔피언을 밴할 수 있습니다.</p>
+      </div>
+      <div class="mode-buttons">
+        <button id="normalModeBtn" class="mode-btn normal-mode-btn">일반 모드</button>
+        <button id="banModeBtn" class="mode-btn ban-mode-btn">밴 모드</button>
       </div>
     </div>
   </div>
 
   <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
   <script>
+    // 서버에서 전달받은 champions 배열을 전역 변수로 정의
+    const champions = JSON.parse('<%- JSON.stringify(champions || []) %>');
+    
+    // 한글 챔피언 이름 매핑
+    const koreanChampionNames = {
+      'Aatrox': '아트록스',
+      'Ahri': '아리',
+      'Akali': '아칼리',
+      'Akshan': '아크샨',
+      'Alistar': '알리스타',
+      'Amumu': '아무무',
+      'Anivia': '애니비아',
+      'Annie': '애니',
+      'Aphelios': '아펠리오스',
+      'Ashe': '애쉬',
+      'AurelionSol': '아우렐리온 솔',
+      'Azir': '아지르',
+      'Bard': '바드',
+      'Belveth': '벨베스',
+      'Blitzcrank': '블리츠크랭크',
+      'Brand': '브랜드',
+      'Braum': '브라움',
+      'Briar': '브라이어',
+      'Caitlyn': '케이틀린',
+      'Camille': '카밀',
+      'Cassiopeia': '카시오페아',
+      'Chogath': '초가스',
+      'Corki': '코르키',
+      'Darius': '다리우스',
+      'Diana': '다이애나',
+      'Draven': '드레이븐',
+      'DrMundo': '문도 박사',
+      'Ekko': '에코',
+      'Elise': '엘리스',
+      'Evelynn': '이블린',
+      'Ezreal': '이즈리얼',
+      'Fiddlesticks': '피들스틱',
+      'Fiora': '피오라',
+      'Fizz': '피즈',
+      'Galio': '갈리오',
+      'Gangplank': '갱플랭크',
+      'Garen': '가렌',
+      'Gnar': '나르',
+      'Gragas': '그라가스',
+      'Graves': '그레이브즈',
+      'Gwen': '그웬',
+      'Hecarim': '헤카림',
+      'Heimerdinger': '하이머딩거',
+      'Illaoi': '일라오이',
+      'Irelia': '이렐리아',
+      'Ivern': '아이번',
+      'Janna': '잔나',
+      'JarvanIV': '자르반 4세',
+      'Jax': '잭스',
+      'Jayce': '제이스',
+      'Jhin': '진',
+      'Jinx': '징크스',
+      'Kaisa': '카이사',
+      'Kalista': '칼리스타',
+      'Karma': '카르마',
+      'Karthus': '카서스',
+      'Kassadin': '카사딘',
+      'Katarina': '카타리나',
+      'Kayle': '케일',
+      'Kayn': '케인',
+      'Kennen': '케넨',
+      'Khazix': '카직스',
+      'Kindred': '킨드레드',
+      'Kled': '클레드',
+      'KogMaw': '코그모',
+      'KSante': '크산테',
+      'Leblanc': '르블랑',
+      'LeeSin': '리 신',
+      'Leona': '레오나',
+      'Lillia': '릴리아',
+      'Lissandra': '리산드라',
+      'Lucian': '루시안',
+      'Lulu': '룰루',
+      'Lux': '럭스',
+      'Malphite': '말파이트',
+      'Malzahar': '말자하',
+      'Maokai': '마오카이',
+      'MasterYi': '마스터 이',
+      'Milio': '밀리오',
+      'MissFortune': '미스 포츈',
+      'Mordekaiser': '모데카이저',
+      'Morgana': '모르가나',
+      'Naafiri': '나피리',
+      'Nami': '나미',
+      'Nasus': '나서스',
+      'Nautilus': '노틸러스',
+      'Neeko': '니코',
+      'Nidalee': '니달리',
+      'Nilah': '닐라',
+      'Nocturne': '녹턴',
+      'Nunu': '누누와 윌럼프',
+      'Olaf': '올라프',
+      'Orianna': '오리아나',
+      'Ornn': '오른',
+      'Pantheon': '판테온',
+      'Poppy': '뽀삐',
+      'Pyke': '파이크',
+      'Qiyana': '키이나',
+      'Quinn': '퀸',
+      'Rakan': '라칸',
+      'Rammus': '람머스',
+      'RekSai': '렉사이',
+      'Rell': '렐',
+      'RenataGlasc': '레나타 글라스크',
+      'Renekton': '레넥톤',
+      'Rengar': '렝가',
+      'Riven': '리븐',
+      'Rumble': '럼블',
+      'Ryze': '라이즈',
+      'Samira': '사미라',
+      'Sejuani': '세주아니',
+      'Senna': '세나',
+      'Seraphine': '세라핀',
+      'Sett': '세트',
+      'Shaco': '샤코',
+      'Shen': '쉔',
+      'Shyvana': '쉬바나',
+      'Singed': '신지드',
+      'Sion': '사이온',
+      'Sivir': '시비르',
+      'Skarner': '스카너',
+      'Sona': '소나',
+      'Soraka': '소라카',
+      'Swain': '스웨인',
+      'Sylas': '사일러스',
+      'Syndra': '신드라',
+      'TahmKench': '탐 켄치',
+      'Taliyah': '탈리야',
+      'Talon': '탈론',
+      'Taric': '타릭',
+      'Teemo': '티모',
+      'Thresh': '쓰레쉬',
+      'Tristana': '트리스타나',
+      'Trundle': '트런들',
+      'Tryndamere': '트린다미어',
+      'TwistedFate': '트위스티드 페이트',
+      'Twitch': '트위치',
+      'Udyr': '우디르',
+      'Urgot': '우르곳',
+      'Varus': '바루스',
+      'Vayne': '베인',
+      'Veigar': '베이가',
+      'Velkoz': '벨코즈',
+      'Vex': '벡스',
+      'Vi': '바이',
+      'Viego': '비에고',
+      'Viktor': '빅토르',
+      'Vladimir': '블라디미르',
+      'Volibear': '볼리베어',
+      'Warwick': '워윅',
+      'Wukong': '오공',
+      'Xayah': '자야',
+      'Xerath': '제라스',
+      'XinZhao': '신 짜오',
+      'Yasuo': '야스오',
+      'Yone': '요네',
+      'Yorick': '요릭',
+      'Yuumi': '유미',
+      'Zac': '자크',
+      'Zed': '제드',
+      'Zeri': '제리',
+      'Ziggs': '직스',
+      'Zilean': '질리언',
+      'Zoe': '조이',
+      'Zyra': '자이라'
+    };
+    
+    // 영문 이름으로 한글 이름 찾기
+    function getKoreanName(englishName) {
+      return koreanChampionNames[englishName] || englishName;
+    }
+    
+    // 한글 이름으로 영문 이름 찾기
+    function getEnglishName(koreanName) {
+      for (const [english, korean] of Object.entries(koreanChampionNames)) {
+        if (korean === koreanName) {
+          return english;
+        }
+      }
+      return koreanName; // 매칭되는 영문 이름이 없으면 입력값 그대로 반환
+    }
+    
     const socket = io();
     let isHost = false;
     let rerollCount = 2;
@@ -710,6 +1427,13 @@
     let hasJoined = false;
     let countdownInterval = null; // 카운트다운 타이머를 저장할 전역 변수
     let isDarkTheme = false;      // 테마 상태 변수
+    let bannedChampions = [];     // 밴 챔피언 목록
+    let isBanMode = false;        // 밴 모드 여부
+    let selectedBanChampion = null; // 현재 선택한 밴할 챔피언
+    let banTimerInterval = null;  // 밴 타이머 인터벌
+    let playerBanStatus = {};     // 플레이어별 밴 상태
+    let myTeamBans = [];          // 내 팀의 밴 챔피언
+    let banPhaseEnded = false;    // 밴 단계 종료 여부
     
     // 플레이어 통계를 위한 변수
     let playerStats = {
@@ -720,7 +1444,7 @@
     };
     
     // 현재 공지사항 버전 - 업데이트마다 숫자를 올려주세요
-    const NOTICE_VERSION = "1.1";
+    const NOTICE_VERSION = "1.2";
 
     // 쿠키 설정 함수
     function setCookie(name, value, days) {
@@ -752,7 +1476,12 @@
       
       if (savedStats) {
         // 저장된 통계가 있다면 불러오기
-        playerStats = JSON.parse(savedStats);
+        const parsedStats = JSON.parse(savedStats);
+        // 기존 rerollCount 값 유지
+        playerStats = {
+          ...parsedStats,
+          rerollCount: parsedStats.rerollCount || 2 // 기존 값이 없을 경우에만 2로 설정
+        };
         console.log('저장된 플레이어 통계 정보 불러옴:', playerStats);
       } else {
         // 저장된 통계가 없다면 기본값 설정
@@ -802,8 +1531,67 @@
     document.addEventListener('DOMContentLoaded', () => {
       loadThemeFromCookie();
       initPlayerStats(); // 플레이어 통계 초기화
+      
+      // 초기 로드 시 밴 챔피언 섹션 숨기기
+      const bannedChampionsSection = document.getElementById('bannedChampionsSection');
+      if (bannedChampionsSection) {
+        bannedChampionsSection.style.display = 'none';
+      }
+      
+      // game-status를 상단에 고정
+      makeGameStatusFixed();
+      
       setTimeout(showNotice, 1000); // 1초 후 공지사항 표시
     });
+    
+    // game-status를 상단에 고정하는 함수
+    function makeGameStatusFixed() {
+      const gameStatus = document.getElementById('gameStatus');
+      const contentWrapper = document.getElementById('contentWrapper');
+      const container = document.querySelector('.container');
+      
+      if (gameStatus && contentWrapper && container) {
+        // fixed-game-status 클래스 추가
+        gameStatus.classList.add('fixed-game-status');
+        
+        // 콘텐츠에 여백 추가
+        contentWrapper.classList.add('status-padding');
+        
+        // 화면 크기에 따라 조정하는 함수
+        function adjustGameStatus() {
+          const containerRect = container.getBoundingClientRect();
+          
+          // 컨테이너의 너비에 맞춤
+          gameStatus.style.width = container.offsetWidth + 'px';
+          
+          // 컨테이너의 좌측 위치에 맞춤 (가운데 정렬)
+          gameStatus.style.left = containerRect.left + 'px';
+          gameStatus.style.right = 'auto';
+          
+          // 게임 상태 메시지 글자 크기 조정
+          const gameStatusMessage = document.getElementById('gameStatusMessage');
+          if (gameStatusMessage) {
+            if (window.innerWidth < 500) {
+              gameStatusMessage.style.fontSize = '0.9em';
+            } else {
+              gameStatusMessage.style.fontSize = '1.2em';
+            }
+          }
+        }
+        
+        // 초기 실행
+        adjustGameStatus();
+        
+        // 리사이즈 및 스크롤 이벤트에 연결
+        window.addEventListener('resize', adjustGameStatus);
+        window.addEventListener('scroll', adjustGameStatus);
+        
+        // 화면 회전 이벤트 (모바일)
+        window.addEventListener('orientationchange', function() {
+          setTimeout(adjustGameStatus, 100);
+        });
+      }
+    }
 
     // 초기 화면 설정
     socket.on('connect', () => {
@@ -916,6 +1704,9 @@
       const container = document.getElementById(containerId);
       container.innerHTML = '';
       
+      // 밴 모드 상태인지 확인
+      const isBanPhaseActive = document.getElementById('bannedChampionsSection').classList.contains('ban-mode');
+      
       players.forEach((player, index) => {
         const seat = document.createElement('div');
         seat.className = `seat ${player ? 'taken' : ''} ${containerId.includes('team1') ? 'team1' : 
@@ -947,14 +1738,23 @@
                 `<div class="champion-display unknown">???</div>`) : ''}
             </div>
           `;
+          
+          // 새로 추가된 플레이어에게 애니메이션 적용
+          if (isCurrentPlayer && player.justMoved) {
+            seat.classList.add('moving');
+            // 애니메이션이 끝나면 클래스 제거
+            setTimeout(() => {
+              seat.classList.remove('moving');
+            }, 800);
+          }
         } else {
           seat.innerHTML = `
             <div class="player-info">
               <div>자리 ${index + 1}</div>
             </div>
-            ${!gameStarted ? '<button class="select-btn">선택하기</button>' : ''}
+            ${!gameStarted && !isBanPhaseActive ? '<button class="select-btn">선택하기</button>' : ''}
           `;
-          if (!gameStarted) {
+          if (!gameStarted && !isBanPhaseActive) {
             seat.querySelector('.select-btn').addEventListener('click', () => {
               const selectedTeam = containerId.includes('team1') ? 'team1' : 
                                  containerId.includes('team2') ? 'team2' : 'waiting';
@@ -962,6 +1762,11 @@
               socket.emit('select-seat', {
                 team: selectedTeam,
                 index
+              });
+              
+              // 자리 선택 시 진행 중인 애니메이션 클래스를 모두 제거
+              document.querySelectorAll('.seat.moving').forEach(el => {
+                el.classList.remove('moving');
               });
             });
           }
@@ -1015,21 +1820,41 @@
       // 게임 시작 여부 확인 (챔피언이 할당된 플레이어가 있는지 확인)
       gameStarted = [...state.team1, ...state.team2].some(player => player && player.champion);
       
+      // 밴 단계 활성화 여부 확인
+      const isBanPhaseActive = document.querySelector('.teams-container').classList.contains('ban-mode');
+      
       // 게임 상태 메시지 업데이트
       const gameStatusMessage = document.getElementById('gameStatusMessage');
       if (gameStarted) {
         gameStatusMessage.textContent = '게임이 시작되었습니다!';
         gameStatusMessage.style.color = '#4CAF50';
+        // 게임 시작되면 밴 컨트롤 숨기기
+        document.getElementById('banPhaseControls').style.display = 'none';
+        // 게임 시작되면 밴 챔피언 섹션 숨기기
+        document.getElementById('bannedChampionsSection').style.display = 'none';
+        // 팀 컨테이너에 no-ban 클래스 추가
+        document.querySelector('.teams-container').classList.add('no-ban');
       } else {
         gameStatusMessage.textContent = '게임이 시작되지 않았습니다. 팀을 선택해주세요.';
-        gameStatusMessage.style.color = '#333';
+        // 게임 시작 전이고 밴 단계가 아닐 때 호스트만 밴 컨트롤 표시
+        document.getElementById('banPhaseControls').style.display = isBanPhaseActive ? 'block' : (isHost ? 'flex' : 'none');
+        // 기본적으로 밴 챔피언 섹션 숨기기 (밴 단계가 시작될 때만 표시)
+        document.getElementById('bannedChampionsSection').style.display = isBanPhaseActive ? 'block' : 'none';
+        // 팀 컨테이너에 no-ban 클래스 추가
+        document.querySelector('.teams-container').classList.add(isBanPhaseActive ? 'ban-mode' : 'no-ban');
       }
       
       updateSeats(state.team1, 'team1Seats');
       updateSeats(state.team2, 'team2Seats');
       updateSeats(state.waiting, 'waitingSeats');
       
-      // 같은 팀의 챔피언 리스트 업데이트
+      // 밴 챔피언 목록 업데이트
+      if (state.bannedChampions) {
+        bannedChampions = state.bannedChampions;
+        updateBannedChampions();
+      }
+      
+      // 내 팀 찾기 (게임 상태 갱신시에도 내 팀 확인)
       let myTeam = null;
       const allPlayers = [...state.team1, ...state.team2, ...state.waiting];
       const currentPlayer = allPlayers.find(p => p && p.id === socket.id);
@@ -1057,17 +1882,31 @@
             savePlayerStats();
           }
         }
+      } else {
+        // 플레이어를 찾지 못했을 경우 team1과 team2에서 직접 찾기
+        const team1Player = state.team1.find(p => p && p.id === socket.id);
+        if (team1Player) {
+          myTeam = 'team1';
+          socket.team = myTeam;
+        }
         
-        // 내 팀이 있고 팀 챔피언 리스트가 존재하면 업데이트
+        const team2Player = state.team2.find(p => p && p.id === socket.id);
+        if (team2Player) {
+          myTeam = 'team2';
+          socket.team = myTeam;
+        }
+      }
+      
+      // 같은 팀의 챔피언 리스트 업데이트
         if (myTeam && state[`${myTeam}Champions`]) {
           updateChampionList(state[`${myTeam}Champions`]);
-        }
       }
       
       // 호스트인 경우에만 시작 버튼 활성화
       if (isHost) {
         const hasWaitingPlayers = state.waiting.some(p => p !== null);
-        document.getElementById('startGameBtn').disabled = hasWaitingPlayers || gameStarted;
+        // 밴 단계에서는 게임 시작 버튼 비활성화
+        document.getElementById('startGameBtn').disabled = hasWaitingPlayers || gameStarted || isBanPhaseActive;
         document.getElementById('resetGameBtn').disabled = !gameStarted;
         document.getElementById('resetRoomBtn').disabled = false;
         
@@ -1114,32 +1953,59 @@
       }
     });
 
-    // 게임 초기화
+    // 게임 초기화 이벤트
     socket.on('game-reset', () => {
+      console.log('게임 초기화 이벤트 수신');
+      
       const rerollBtn = document.getElementById('rerollBtn');
       rerollBtn.disabled = true;
-    });
-
-    // 호스트 변경 이벤트
-    socket.on('host-changed', (isNewHost) => {
-      isHost = isNewHost;
-      if (isHost) {
-        document.getElementById('resetGameBtn').disabled = false;
+      
+      // 게임 초기화시 밴 챔피언 섹션 숨기기
+      document.getElementById('bannedChampionsSection').style.display = 'none';
+      
+      // 밴 목록 초기화
+      bannedChampions = [];
+      playerBanStatus = {};
+      banPhaseEnded = false;  // 밴 단계 종료 플래그 초기화
+      
+      // 팀 컨테이너에 no-ban 클래스 추가
+      document.querySelector('.teams-container').classList.add('no-ban');
+      document.querySelector('.teams-container').classList.remove('ban-mode');
+      
+      // 팀에서 my-team 클래스 제거
+      document.querySelectorAll('.team').forEach(team => {
+        team.classList.remove('my-team');
+      });
+      
+      // 밴 슬롯 초기화를 여러 번 시도하여 확실히 처리
+      // 즉시 한 번 실행
+      forceResetAllBanSlots();
+      
+      // 약간의 지연 후 한 번 더 실행 (비동기 네트워크 지연 고려)
+      setTimeout(() => {
+        forceResetAllBanSlots();
+      }, 100);
+      
+      // 조금 더 지연 후 한 번 더 실행 (화면 리프레시 등의 상황 고려)
+      setTimeout(() => {
+        forceResetAllBanSlots();
+      }, 500);
+      
+      // 초기화 알림
         Toastify({
-          text: "호스트 권한이 부여되었습니다!",
+        text: "게임이 초기화되었습니다.",
           duration: 1500,
           gravity: "top",
           position: "center",
           style: {
-            background: "linear-gradient(to right, #00b09b, #96c93d)",
+          background: "linear-gradient(to right, #4CAF50, #2E7D32)",
             color: "white",
             fontWeight: "bold",
-            fontSize: "16px",
-            padding: "15px",
+          fontSize: "14px",
+          padding: "12px",
             borderRadius: "5px"
           }
         }).showToast();
-      }
     });
 
     // 게임 초기화 버튼
@@ -1254,20 +2120,134 @@
       // 버튼 이벤트 리스너
       document.getElementById('team1Win').addEventListener('click', () => {
         // 승리 팀 정보만 서버에 전송하고 승패 처리는 서버에서 수행
-        socket.emit('reset-game', { winningTeam: 'team1' });
+        socket.emit('reset-game', { winningTeam: 'team1', resetBans: true });
         document.body.removeChild(modal);
+        
+        // 밴 슬롯 초기화 - 즉시 초기화 처리
+        forceResetAllBanSlots();
+        banPhaseEnded = false;
       });
       
       document.getElementById('team2Win').addEventListener('click', () => {
         // 승리 팀 정보만 서버에 전송하고 승패 처리는 서버에서 수행
-        socket.emit('reset-game', { winningTeam: 'team2' });
+        socket.emit('reset-game', { winningTeam: 'team2', resetBans: true });
         document.body.removeChild(modal);
+        
+        // 밴 슬롯 초기화 - 즉시 초기화 처리
+        forceResetAllBanSlots();
+        banPhaseEnded = false;
       });
       
       document.getElementById('noWinner').addEventListener('click', () => {
-        socket.emit('reset-game', { winningTeam: null });
+        socket.emit('reset-game', { winningTeam: null, resetBans: true });
         document.body.removeChild(modal);
+        
+        // 밴 슬롯 초기화 - 즉시 초기화 처리
+        forceResetAllBanSlots();
+        banPhaseEnded = false;
       });
+    });
+    
+    // 강제 밴 슬롯 초기화 - 더 강력한 버전
+    function forceResetAllBanSlots() {
+      console.log('강제 밴 슬롯 초기화 실행');
+      
+      try {
+        // 모든 팀의 모든 밴 슬롯 초기화
+        const allBanSlots = document.querySelectorAll('.team-ban-slots .ban-slot');
+        
+        allBanSlots.forEach((slot, index) => {
+          // 기존 내용물 전체 삭제
+          while(slot.firstChild) {
+            slot.removeChild(slot.firstChild);
+          }
+          
+          // empty 클래스 추가 및 스타일 직접 설정
+          slot.classList.add('empty');
+          
+          // 추가 스타일 초기화
+          slot.style.backgroundImage = '';
+          slot.style.opacity = '';
+        });
+        
+        // 중앙 밴 섹션 초기화
+        const bannedChampionsContainer = document.getElementById('bannedChampions');
+        if (bannedChampionsContainer) {
+          bannedChampionsContainer.innerHTML = '<div class="empty-champion-list">밴된 챔피언이 없습니다</div>';
+        }
+        
+        // 숨겨진 밴 슬롯 표시 복원 (비주얼 초기화)
+        document.querySelectorAll('.team-ban-slots').forEach(slot => {
+          slot.style.visibility = '';
+          slot.style.display = '';
+        });
+        
+        // 강제 리플로우 및 렌더링 트리거
+        void document.body.offsetHeight;
+        document.documentElement.style.display = 'none';
+        document.documentElement.offsetHeight;
+        document.documentElement.style.display = '';
+      } catch (error) {
+        console.error('밴 슬롯 초기화 중 오류 발생:', error);
+      }
+    }
+    
+    // 기존 밴 슬롯 초기화 함수 - 백업
+    function resetBanSlots() {
+      console.log('기본 밴 슬롯 초기화 실행');
+      
+      // 팀1 밴 슬롯 초기화
+      const team1BanSlots = document.querySelectorAll('.teams-container .team:first-child .team-ban-slots .ban-slot');
+      team1BanSlots.forEach(slot => {
+        slot.innerHTML = '';
+        slot.classList.add('empty');
+      });
+      
+      // 팀2 밴 슬롯 초기화
+      const team2BanSlots = document.querySelectorAll('.teams-container .team:last-child .team-ban-slots .ban-slot');
+      team2BanSlots.forEach(slot => {
+        slot.innerHTML = '';
+        slot.classList.add('empty');
+      });
+      
+      // 중앙 밴 섹션 초기화
+      const bannedChampionsContainer = document.getElementById('bannedChampions');
+      if (bannedChampionsContainer) {
+        bannedChampionsContainer.innerHTML = '<div class="empty-champion-list">밴된 챔피언이 없습니다</div>';
+      }
+      
+      // 슬롯 상태 적용을 위한 강제 리플로우
+      void document.body.offsetHeight;
+    }
+
+    // 호스트 변경 이벤트
+    socket.on('host-changed', (isNewHost) => {
+      isHost = isNewHost;
+      if (isHost) {
+        document.getElementById('resetGameBtn').disabled = false;
+        // 호스트면 밴 컨트롤 표시
+        if (!gameStarted) {
+          document.getElementById('banPhaseControls').style.display = 'flex';
+        }
+        
+        Toastify({
+          text: "호스트 권한이 부여되었습니다!",
+          duration: 1500,
+          gravity: "top",
+          position: "center",
+          style: {
+            background: "linear-gradient(to right, #00b09b, #96c93d)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "16px",
+            padding: "15px",
+            borderRadius: "5px"
+          }
+        }).showToast();
+      } else {
+        // 호스트가 아니면 밴 컨트롤 숨기기
+        document.getElementById('banPhaseControls').style.display = 'none';
+      }
     });
 
     // 방 초기화 버튼
@@ -1296,7 +2276,7 @@
       }).showToast();
     });
 
-    // 방 초기화 이벤트 처리
+    // 방 초기화
     socket.on('room-reset', () => {
       Toastify({
         text: "방이 초기화되었습니다. 페이지를 새로고침하세요.",
@@ -1316,6 +2296,9 @@
       // 접속 상태 초기화
       hasJoined = false;
       localStorage.removeItem('hasJoined');
+      
+      // 밴 슬롯 초기화
+      resetBanSlots();
       
       // 3초 후 페이지 새로고침
       setTimeout(() => {
@@ -1353,41 +2336,74 @@
         return;
       }
       
+      // 게임 모드 확인 - 밴 모드에서는 밴된 챔피언 표시 로직 변경
+      const isBanPhaseActive = document.querySelector('.teams-container').classList.contains('ban-mode');
+      const isGameStarted = gameStarted; // 전역 변수 사용
+      
+      // 밴 모드와 게임 시작 여부에 따른 처리
+      if (isBanPhaseActive && !isGameStarted) {
+        // 밴 단계에서는 밴된 챔피언만 확인
+        const myStatus = playerBanStatus[socket.id];
+        const myBannedChampion = myStatus && myStatus.champion ? myStatus.champion : null;
+        
+        // 챔피언 목록 순회하며 그리드에 추가
       champions.forEach(champion => {
-        const championItem = document.createElement('div');
-        championItem.className = 'champion-item';
-        championItem.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}" title="${champion}">`;
-        championItem.setAttribute('data-champion', champion);
-        
-        // 클릭 시 스왑 요청
-        championItem.addEventListener('click', () => {
-          // 클릭 효과 추가
-          championItem.style.transform = 'scale(0.9)';
-          setTimeout(() => {
-            championItem.style.transform = 'scale(1)';
-          }, 100);
+          const item = document.createElement('div');
+          item.className = 'champion-item';
           
-          socket.emit('swap-champion', champion);
+          // 내가 밴한 챔피언만 밴 표시
+          const isBanned = myBannedChampion === champion;
           
-          // 토스트 메시지 표시
-          Toastify({
-            text: `${champion} 챔피언으로 스왑 요청`,
-            duration: 1500,
-            gravity: "bottom",
-            position: "right",
-            style: {
-              background: "linear-gradient(to right, #9C27B0, #673AB7)",
-              color: "white",
-              fontWeight: "bold",
-              fontSize: "14px",
-              padding: "12px",
-              borderRadius: "5px"
-            }
-          }).showToast();
+          if (isBanned) {
+            item.classList.add('banned');
+          }
+          
+          // 한글 이름 추가
+          const koreanName = getKoreanName(champion);
+          item.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}" title="${koreanName}">`;
+          
+          // 밴 선택 이벤트
+          if (!isBanned) {
+            item.addEventListener('click', () => {
+              // 이전에 선택한 챔피언 스타일 초기화
+              const prevSelected = document.querySelector('.champion-item.selected');
+              if (prevSelected) {
+                prevSelected.classList.remove('selected');
+              }
+              
+              // 현재 챔피언 선택 표시
+              item.classList.add('selected');
+              
+              // 선택한 챔피언 저장
+              selectedBanChampion = champion;
+              
+              // 밴 확정 버튼 활성화
+              document.getElementById('banConfirmBtn').disabled = false;
+            });
+          }
+          
+          championList.appendChild(item);
         });
-        
-        championList.appendChild(championItem);
-      });
+      } else {
+        // 게임 시작 후에는 스왑 가능한 챔피언 리스트
+        champions.forEach(champion => {
+          const item = document.createElement('div');
+          item.className = 'champion-item';
+          
+          // 한글 이름 추가
+          const koreanName = getKoreanName(champion);
+          item.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}" title="${koreanName}">`;
+          
+          // 챔피언 스왑 이벤트 리스너 등록
+          item.addEventListener('click', () => {
+            // 내 현재 챔피언과 스왑
+            console.log('챔피언 스왑 요청:', champion);
+            socket.emit('swap-champion', champion);
+          });
+          
+          championList.appendChild(item);
+        });
+      }
     }
 
     // 챔피언 리스트 업데이트 이벤트
@@ -1456,7 +2472,6 @@
       // 게임 상태 메시지 초기화
       const gameStatusMessage = document.getElementById('gameStatusMessage');
       gameStatusMessage.textContent = '게임이 시작되지 않았습니다. 팀을 선택해주세요.';
-      gameStatusMessage.style.color = '#333';
     });
 
     // 챔피언 스왑 성공 이벤트
@@ -1560,6 +2575,9 @@
           <div class="notice-title">업데이트 안내</div>
           <div class="notice-content">
             <div class="notice-update-item">
+              <b>밴 모드 추가</b>: 밴 모드가 추가되었습니다. 각 팀에서 밴 할 챔피언을 선택할 수 있습니다.
+            </div>
+            <div class="notice-update-item">
               <b>플레이어 통계 시스템 추가</b>: 이제 각 플레이어의 승리, 패배, 승률이 표시됩니다.
             </div>
             <div class="notice-update-item">
@@ -1576,9 +2594,6 @@
             </div>
             <div class="notice-update-item">
               <b>다크 모드 설정 저장</b>: 테마 설정 저장되어 브라우저를 닫았다가 다시 열어도 설정이 유지됩니다.
-            </div>
-            <div class="notice-update-item">
-              <b>UI 개선</b>: UI를 개선했습니다.
             </div>
           </div>
           <div class="notice-buttons">
@@ -1628,7 +2643,589 @@
     // 게임 시작 버튼
     document.getElementById('startGameBtn').addEventListener('click', () => {
       if (isHost) {
-        socket.emit('start-game');
+        // 게임 모드 선택 모달 표시
+        document.getElementById('modeSelectModal').style.display = 'flex';
+      }
+    });
+
+    // 일반 모드 버튼 클릭
+    document.getElementById('normalModeBtn').addEventListener('click', () => {
+      document.getElementById('modeSelectModal').style.display = 'none';
+      isBanMode = false;
+      socket.emit('start-game', { mode: 'normal' });
+    });
+
+    // 밴 모드 버튼 클릭
+    document.getElementById('banModeBtn').addEventListener('click', () => {
+      document.getElementById('modeSelectModal').style.display = 'none';
+      isBanMode = true;
+      // 모든 밴 슬롯 초기화
+      resetBanSlots();
+      socket.emit('start-game', { mode: 'ban' });
+    });
+
+    // 밴 모드 시작 이벤트 처리
+    socket.on('start-ban-phase', (data) => {
+      // 밴 단계 시작
+      document.getElementById('bannedChampionsTitle').textContent = '밴할 챔피언을 선택해주세요';
+      
+      // 게임 상태 메시지 업데이트 - 밴 단계 안내
+      const gameStatusMessage = document.getElementById('gameStatusMessage');
+      if (gameStatusMessage) {
+        gameStatusMessage.textContent = '밴 단계: 밴할 챔피언을 선택해주세요!';
+        gameStatusMessage.style.color = '#f44336'; // 밴 단계에서는 붉은색으로 표시
+      }
+      
+      // 밴 단계 종료 플래그 초기화
+      banPhaseEnded = false;
+      
+      // 밴 모드로 UI 변경
+      const bannedChampionsSection = document.getElementById('bannedChampionsSection');
+      bannedChampionsSection.classList.add('ban-mode');
+      bannedChampionsSection.style.display = 'block'; // 밴 단계에서는 밴 섹션 표시
+      
+      // 팀 컨테이너에서 no-ban 클래스 제거
+      const teamsContainer = document.querySelector('.teams-container');
+      teamsContainer.classList.remove('no-ban');
+      teamsContainer.classList.add('ban-mode');
+      
+      // 플레이어 밴 상태 초기화
+      playerBanStatus = data.players;
+      
+      // 내 팀 확인 - 여러 방법으로 시도
+      let myTeam = socket.team; // 기본값으로 소켓에 저장된 팀 사용
+      
+      // 플레이어 밴 상태에서 내 팀 확인
+      if (playerBanStatus[socket.id] && playerBanStatus[socket.id].team) {
+        myTeam = playerBanStatus[socket.id].team;
+      }
+      
+      // 게임 상태에서 내 팀 확인
+      if (data.state) {
+        // team1에서 확인
+        const team1Player = data.state.team1.find(p => p && p.id === socket.id);
+        if (team1Player) {
+          myTeam = 'team1';
+        }
+        
+        // team2에서 확인
+        const team2Player = data.state.team2.find(p => p && p.id === socket.id);
+        if (team2Player) {
+          myTeam = 'team2';
+        }
+      }
+      
+      console.log('내 팀 확인:', myTeam, '소켓 ID:', socket.id);
+      
+      // 내 팀에 클래스 추가 (CSS 식별용)
+      const teams = document.querySelectorAll('.team');
+      teams.forEach((team, index) => {
+        // index 0 = 팀 1, index 1 = 팀 2
+        const teamType = index === 0 ? 'team1' : 'team2';
+        if (teamType === myTeam) {
+          team.classList.add('my-team');
+        } else {
+          team.classList.remove('my-team');
+        }
+      });
+      
+      // 중앙 섹션 컨트롤 표시
+      document.getElementById('playerBanStatus').style.display = 'flex';
+      document.getElementById('banTimerDisplay').style.display = 'block';
+      
+      // 호스트 여부에 상관없이 모든 플레이어에게 챔피언 리스트 표시
+      // 단, 밴 확정 버튼은 각자 필요함
+      document.getElementById('banPhaseControls').style.display = 'block';
+      document.getElementById('bannedChampions').style.display = 'none';
+      
+      // 밴 단계에서도 챔피언 리스트 섹션 표시 유지
+      document.querySelector('.champion-list').style.display = 'block';
+      
+      updatePlayerBanStatus();
+      
+      // 모든 챔피언 표시
+      renderChampionGrid();
+      
+      // 밴 타이머 시작 (1분 30초)
+      startBanTimer(90);
+      
+      // 모든 자리 업데이트 - 밴 모드에서는 자리 이동 버튼 비활성화
+      const state = data.state;
+      if (state) {
+        updateSeats(state.team1, 'team1Seats');
+        updateSeats(state.team2, 'team2Seats');
+        updateSeats(state.waiting, 'waitingSeats');
+        
+        // 현재 팀 밴 상태 표시 - 자기 팀만
+        if (myTeam === 'team1' && state.team1Bans && state.team1Bans.length > 0) {
+          updateTeamBanSlots('team1', state.team1Bans);
+        } else if (myTeam === 'team2' && state.team2Bans && state.team2Bans.length > 0) {
+          updateTeamBanSlots('team2', state.team2Bans);
+        }
+      }
+      
+      // 밴 단계에서는 게임 시작 버튼 비활성화
+      if (isHost) {
+        document.getElementById('startGameBtn').disabled = true;
+      }
+    });
+
+    // 밴 단계 완료 이벤트
+    socket.on('ban-phase-complete', (data) => {
+      // 밴 단계 종료 플래그 설정
+      banPhaseEnded = true;
+      
+      // 게임 상태 메시지 업데이트 - 밴 단계 종료 표시
+      const gameStatusMessage = document.getElementById('gameStatusMessage');
+      if (gameStatusMessage) {
+        gameStatusMessage.textContent = '밴 단계 완료! 게임이 시작됩니다.';
+        gameStatusMessage.style.color = '#4CAF50'; // 밴 단계 종료 후 녹색으로 표시
+      }
+      
+      // 밴 타이머 정지
+      if (banTimerInterval) {
+        clearInterval(banTimerInterval);
+        banTimerInterval = null;
+      }
+      
+      // 이제 밴 단계가 끝났으므로 팀별 밴 챔피언 업데이트 (이제 모든 정보 표시)
+      if (data.team1Bans && data.team1Bans.length > 0) {
+        updateTeamBanSlots('team1', data.team1Bans);
+      }
+      if (data.team2Bans && data.team2Bans.length > 0) {
+        updateTeamBanSlots('team2', data.team2Bans);
+      }
+      
+      // 밴 섹션 원래 상태로 복원
+      const bannedChampionsSection = document.getElementById('bannedChampionsSection');
+      bannedChampionsSection.classList.remove('ban-mode');
+      bannedChampionsSection.style.display = 'none'; // 밴 단계 완료 후 밴 섹션 숨기기
+      
+      // 팀 컨테이너에 no-ban 클래스 추가
+      const teamsContainer = document.querySelector('.teams-container');
+      teamsContainer.classList.add('no-ban');
+      teamsContainer.classList.remove('ban-mode');
+      
+      // 팀에서 my-team 클래스 제거
+      document.querySelectorAll('.team').forEach(team => {
+        team.classList.remove('my-team');
+      });
+      
+      document.getElementById('bannedChampionsTitle').textContent = '밴 챔피언';
+      document.getElementById('playerBanStatus').style.display = 'none';
+      document.getElementById('banTimerDisplay').style.display = 'none';
+      document.getElementById('banPhaseControls').style.display = 'none';
+      document.getElementById('bannedChampions').style.display = 'grid';
+      
+      // 전체 밴 챔피언 목록 업데이트
+      bannedChampions = data.allBannedChampions;
+      updateBannedChampions(); // 중앙 밴 챔피언 섹션 업데이트
+      
+      // 게임 시작 알림
+      Toastify({
+        text: "밴 단계가 완료되었습니다. 게임을 시작합니다!",
+        duration: 3000,
+        gravity: "top",
+        position: "center",
+        style: {
+          background: "linear-gradient(to right, #4CAF50, #2E7D32)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "16px",
+          padding: "15px",
+          borderRadius: "5px"
+        }
+      }).showToast();
+    });
+    
+    // 밴 타이머 시작 함수
+    function startBanTimer(duration) {
+      let timer = duration;
+      const timerDisplay = document.getElementById('banTimerDisplay');
+      const gameStatusMessage = document.getElementById('gameStatusMessage');
+      
+      // 이전 타이머가 있다면 초기화
+      if (banTimerInterval) {
+        clearInterval(banTimerInterval);
+      }
+      
+      updateTimerDisplay();
+      
+      banTimerInterval = setInterval(() => {
+        timer--;
+        updateTimerDisplay();
+        
+        // 타이머 경과 시간에 따라 게임 상태 메시지 업데이트
+        if (timer <= 10 && gameStatusMessage) {
+          gameStatusMessage.textContent = `밴 단계: 서둘러 밴할 챔피언을 선택하세요! (${timer}초 남음)`;
+          gameStatusMessage.style.color = timer % 2 === 0 ? '#ff0000' : '#ff9800'; // 깜빡이는 효과
+        }
+        
+        if (timer <= 0) {
+          clearInterval(banTimerInterval);
+          
+          // 타이머 종료 시 게임 상태 메시지 업데이트
+          if (gameStatusMessage) {
+            gameStatusMessage.textContent = '밴 시간이 종료되었습니다. 밴 처리 중...';
+            gameStatusMessage.style.color = '#ff9800';
+          }
+          
+          // 시간이 다 됐는데 밴을 선택하지 않았다면 자동으로 랜덤 밴
+          if (!selectedBanChampion) {
+            const availableChampions = getAvailableBanChampions();
+            if (availableChampions.length > 0) {
+              const randomIndex = Math.floor(Math.random() * availableChampions.length);
+              selectedBanChampion = availableChampions[randomIndex];
+              socket.emit('ban-champion', {
+                champion: selectedBanChampion,
+                auto: true
+              });
+            }
+          }
+        }
+      }, 1000);
+      
+      function updateTimerDisplay() {
+        const minutes = Math.floor(timer / 60);
+        const seconds = timer % 60;
+        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        // 10초 이하로 남으면 빨간색으로 깜빡이게
+        if (timer <= 10) {
+          timerDisplay.style.color = timer % 2 === 0 ? '#f44336' : '#ff9800';
+        } else {
+          timerDisplay.style.color = '#f44336';
+        }
+      }
+    }
+
+    // 사용 가능한 밴 챔피언 목록 가져오기
+    function getAvailableBanChampions() {
+      // 이미 밴된 챔피언들을 제외한 목록 반환
+      const allBannedChampions = Object.values(playerBanStatus)
+                                      .filter(status => status.champion)
+                                      .map(status => status.champion);
+      
+      return champions.filter(champion => !allBannedChampions.includes(champion));
+    }
+
+    // 챔피언 그리드 렌더링
+    function renderChampionGrid() {
+      const grid = document.getElementById('championGrid');
+      grid.innerHTML = '';
+      
+      // 내 정보와 밴한 챔피언 확인
+      const myStatus = playerBanStatus[socket.id];
+      const myTeam = myStatus ? myStatus.team : socket.team;
+      const myBannedChampion = myStatus && myStatus.champion ? myStatus.champion : null;
+      
+      // 팀별로 이미 밴한 챔피언 목록 구성
+      const myTeamBans = [];
+      const myTeamSelecting = [];
+      const enemyTeamBans = [];
+      
+      Object.values(playerBanStatus).forEach(status => {
+        if (status.team === myTeam) {
+          if (status.champion) {
+            myTeamBans.push(status.champion);
+          } else if (status.selectingChampion) {
+            myTeamSelecting.push(status.selectingChampion);
+          }
+        } else if (status.champion) {
+          enemyTeamBans.push(status.champion);
+        }
+      });
+      
+      // 챔피언 목록 순회하며 그리드에 추가
+      champions.forEach(champion => {
+        const item = document.createElement('div');
+        item.className = 'champion-item';
+        
+        // 내가 밴한 챔피언 또는 같은 팀이 이미 밴한 챔피언은 밴 표시
+        const isBannedByMe = myBannedChampion === champion;
+        const isBannedByMyTeam = myTeamBans.includes(champion);
+        const isSelectedByMyTeam = myTeamSelecting.includes(champion);
+        
+        if (isBannedByMe || isBannedByMyTeam) {
+          item.classList.add('banned');
+        } else if (isSelectedByMyTeam) {
+          item.classList.add('selected-by-team');
+        }
+        
+        // 한글 이름 추가
+        const koreanName = getKoreanName(champion);
+        item.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}" title="${koreanName}">`;
+        
+        // 밴 선택 이벤트 - 내가 이미 밴했거나 같은 팀이 밴한 챔피언은 선택 불가
+        if (!isBannedByMe && !isBannedByMyTeam) {
+          item.addEventListener('click', () => {
+            // 이전에 선택한 챔피언 스타일 초기화
+            const prevSelected = document.querySelector('.champion-item.selected');
+            if (prevSelected) {
+              prevSelected.classList.remove('selected');
+            }
+            
+            // 현재 챔피언 선택 표시
+            item.classList.add('selected');
+            
+            // 선택한 챔피언 저장
+            selectedBanChampion = champion;
+            
+            // 선택 중인 챔피언 정보 서버에 전송 (아직 확정은 아님)
+            socket.emit('selecting-ban-champion', champion);
+            
+            // 밴 확정 버튼 활성화
+            document.getElementById('banConfirmBtn').disabled = false;
+          });
+        } else {
+          // 같은 팀이 이미 밴한 챔피언은 선택 불가
+          item.style.pointerEvents = 'none';
+        }
+        
+        grid.appendChild(item);
+      });
+    }
+
+    // 플레이어 밴 상태 업데이트
+    function updatePlayerBanStatus() {
+      const container = document.getElementById('playerBanStatus');
+      container.innerHTML = '';
+      
+      // 내 팀 정보 확인
+      const myStatus = playerBanStatus[socket.id];
+      const myTeam = myStatus ? myStatus.team : socket.team;
+      
+      // 플레이어를 팀별로 분류
+      const myTeamPlayers = [];
+      
+      Object.entries(playerBanStatus).forEach(([playerId, data]) => {
+        if (data.team === myTeam) {
+          myTeamPlayers.push({playerId, ...data});
+        }
+      });
+      
+      // 내 팀 섹션 제목 추가
+      const myTeamHeader = document.createElement('div');
+      myTeamHeader.className = 'ban-team-header';
+      myTeamHeader.textContent = myTeam === 'team1' ? '팀 1 밴 현황' : '팀 2 밴 현황';
+      container.appendChild(myTeamHeader);
+      
+      // 내 팀 플레이어 상태 표시
+      myTeamPlayers.forEach(player => {
+        const isCurrentPlayer = player.playerId === socket.id;
+        const item = document.createElement('div');
+        item.className = `player-ban-item ${player.champion ? 'completed' : 'selecting'}`;
+        
+        let displayName = player.nickname;
+        if (isCurrentPlayer) {
+          displayName += ' (나)';
+        }
+        
+        let banStatus = '';
+        if (player.champion) {
+          // 내 팀이 밴한 챔피언은 항상 표시
+          const championName = player.champion;
+          const koreanName = getKoreanName(championName);
+          banStatus = `<div class="player-ban-image" title="${koreanName}"><img src="/champions/${championName}.png" alt="${championName}"></div>`;
+        } else if (player.selectingChampion) {
+          // 선택 중인 챔피언이 있으면 표시
+          const championName = player.selectingChampion;
+          const koreanName = getKoreanName(championName);
+          banStatus = `<div class="player-ban-image" title="${koreanName} (선택 중)" style="opacity:0.7;"><img src="/champions/${championName}.png" alt="${championName}"></div>`;
+        } else {
+          // 아무것도 선택하지 않은 경우 "선택 중" 표시
+          banStatus = `<span class="selecting-status">선택 중...</span>`;
+        }
+        
+        item.innerHTML = `
+          <span>${displayName}</span>
+          ${banStatus}
+        `;
+        
+        container.appendChild(item);
+      });
+      
+      // 상대팀 섹션은 표시하지 않음 (완전히 제거)
+    }
+
+    // 밴 확정 버튼 클릭
+    document.getElementById('banConfirmBtn').addEventListener('click', () => {
+      if (selectedBanChampion) {
+        socket.emit('ban-champion', {
+          champion: selectedBanChampion,
+          auto: false
+        });
+        
+        // 버튼 비활성화
+        document.getElementById('banConfirmBtn').disabled = true;
+        
+        // 선택 중인 상태 초기화
+        socket.emit('selecting-ban-champion', null);
+      }
+    });
+
+    // 밴 확정 응답 이벤트 처리
+    socket.on('ban-confirmed', (data) => {
+      // 플레이어 밴 상태 업데이트
+      if (data.playerId && playerBanStatus[data.playerId]) {
+        // 해당 플레이어의 밴 상태 업데이트
+        playerBanStatus[data.playerId].champion = data.champion;
+        playerBanStatus[data.playerId].selectingChampion = null;
+        
+        // 나의 밴이라면 선택 초기화
+        if (data.playerId === socket.id) {
+          selectedBanChampion = null;
+          
+          // 선택된 챔피언 스타일 초기화
+          const selectedChamp = document.querySelector('.champion-item.selected');
+          if (selectedChamp) {
+            selectedChamp.classList.remove('selected');
+          }
+          
+          // 토스트 알림 표시
+          Toastify({
+            text: data.auto ? 
+                  `시간 초과로 ${getKoreanName(data.champion)} 챔피언이 자동 밴 되었습니다!` : 
+                  `${getKoreanName(data.champion)} 챔피언을 밴했습니다!`,
+            duration: 3000,
+            gravity: "top",
+            position: "center",
+            style: {
+              background: data.auto ? 
+                        "linear-gradient(to right, #ff9800, #f57c00)" : 
+                        "linear-gradient(to right, #f44336, #d32f2f)",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "14px",
+              padding: "12px",
+              borderRadius: "5px"
+            }
+          }).showToast();
+        }
+        
+        // UI 업데이트
+        updatePlayerBanStatus();
+        renderChampionGrid();
+      }
+    });
+
+    // 밴 검색 입력 처리
+    document.getElementById('banSearchInput').addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      
+      // 모든 챔피언 아이템 순회하며 검색어에 맞는 것만 표시
+      const items = document.querySelectorAll('.champion-item');
+      items.forEach(item => {
+        const championNameEnglish = item.querySelector('img').alt;
+        const championNameKorean = getKoreanName(championNameEnglish).toLowerCase();
+        
+        // 영문 이름이나 한글 이름에 검색어가 포함되어 있으면 표시
+        if (championNameEnglish.toLowerCase().includes(searchTerm) || 
+            championNameKorean.includes(searchTerm) || 
+            searchTerm === '') {
+          item.style.display = '';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+
+    // 밴 챔피언 업데이트 함수
+    function updateBannedChampions() {
+      const bannedList = document.getElementById('bannedChampions');
+      bannedList.innerHTML = '';
+      
+      if (!bannedChampions || bannedChampions.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-champion-list';
+        emptyMessage.textContent = '밴된 챔피언이 없습니다';
+        bannedList.appendChild(emptyMessage);
+        return;
+      }
+      
+      bannedChampions.forEach(champion => {
+        const bannedChampion = document.createElement('div');
+        bannedChampion.className = 'banned-champion';
+        bannedChampion.innerHTML = `
+          <img src="/champions/${champion}.png" alt="${champion}" title="${champion}">
+        `;
+        bannedList.appendChild(bannedChampion);
+      });
+    }
+
+    // 팀 밴 슬롯 업데이트 함수
+    function updateTeamBanSlots(team, bannedChampions) {
+      if (!bannedChampions || !team) return;
+      
+      // 밴 슬롯 선택 (팀 1 또는 팀 2)
+      const teamSelector = team === 'team1' ? '.teams-container .team:first-child' : '.teams-container .team:last-child';
+      const banSlots = document.querySelectorAll(`${teamSelector} .team-ban-slots .ban-slot`);
+      
+      // 모든 슬롯 초기화
+      banSlots.forEach(slot => {
+        slot.innerHTML = '';
+        slot.classList.add('empty');
+      });
+      
+      // 밴된 챔피언 표시
+      bannedChampions.forEach((champion, index) => {
+        if (index < banSlots.length && champion) {
+          const slot = banSlots[index];
+          slot.innerHTML = `<img src="/champions/${champion}.png" alt="${champion}" title="${getKoreanName(champion)}">`;
+          slot.classList.remove('empty');
+        }
+      });
+    }
+
+    // 밴 슬롯 초기화 함수
+    function resetBanSlots() {
+      console.log('밴 슬롯 초기화 실행');
+      
+      // 팀1 밴 슬롯 초기화
+      const team1BanSlots = document.querySelectorAll('.teams-container .team:first-child .team-ban-slots .ban-slot');
+      team1BanSlots.forEach(slot => {
+        slot.innerHTML = '';
+        slot.classList.add('empty');
+      });
+      
+      // 팀2 밴 슬롯 초기화
+      const team2BanSlots = document.querySelectorAll('.teams-container .team:last-child .team-ban-slots .ban-slot');
+      team2BanSlots.forEach(slot => {
+        slot.innerHTML = '';
+        slot.classList.add('empty');
+      });
+      
+      // 중앙 밴 섹션 초기화
+      const bannedChampionsContainer = document.getElementById('bannedChampions');
+      if (bannedChampionsContainer) {
+        bannedChampionsContainer.innerHTML = '<div class="empty-champion-list">밴된 챔피언이 없습니다</div>';
+      }
+      
+      // 슬롯 상태 적용을 위한 강제 리플로우
+      void document.body.offsetHeight;
+    }
+
+    // 플레이어 밴 선택 중인 챔피언 업데이트 이벤트
+    socket.on('player-selecting-champion', (data) => {
+      // 플레이어가 선택 중인 챔피언 정보 업데이트
+      if (data.playerId && data.playerId !== socket.id) { // 자신이 아닌 다른 플레이어의 정보만 업데이트
+        if (playerBanStatus[data.playerId]) {
+          // 같은 팀인지 확인
+          const myStatus = playerBanStatus[socket.id];
+          const myTeam = myStatus ? myStatus.team : socket.team;
+          const playerTeam = playerBanStatus[data.playerId].team;
+          
+          // 같은 팀인 경우에만 선택 중인 챔피언 표시
+          if (myTeam === playerTeam) {
+            playerBanStatus[data.playerId].selectingChampion = data.champion;
+            
+            // 플레이어 밴 상태 UI 업데이트
+            updatePlayerBanStatus();
+            
+            // 챔피언 그리드 업데이트
+            renderChampionGrid();
+          }
+        }
       }
     });
   </script>
