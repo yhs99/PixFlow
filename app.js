@@ -201,12 +201,54 @@ io.on('connection', (socket) => {
         
         socket.nickname = foundPlayer.nickname;
         
-        // 자리 업데이트
-        if (foundPlayer.team && foundPlayer.index !== null) {
-          if (room.gameState[foundPlayer.team][foundPlayer.index]) {
-            room.gameState[foundPlayer.team][foundPlayer.index] = foundPlayer;
+        // 저장된 좌석 정보가 있을 경우 해당 좌석으로 우선 배치 시도
+        let seatAssigned = false;
+        if (stats.seatInfo && stats.seatInfo.team && stats.seatInfo.index !== undefined) {
+          const { team, index } = stats.seatInfo;
+          
+          // 유효한 팀과 인덱스인지 확인
+          if ((team === 'team1' || team === 'team2' || team === 'waiting') && 
+              index >= 0 && 
+              index < (team === 'waiting' ? 10 : 5)) {
+            
+            // 이전 자리에서 플레이어 제거
+            if (foundPlayer.team && foundPlayer.index !== null) {
+              room.gameState[foundPlayer.team][foundPlayer.index] = null;
+            }
+            
+            // 해당 좌석이 비어있는지 확인
+            if (room.gameState[team][index] === null) {
+              console.log(`저장된 좌석으로 배치: ${team} 팀의 ${index} 자리`);
+              foundPlayer.team = team;
+              foundPlayer.index = index;
+              room.gameState[team][index] = foundPlayer;
+              seatAssigned = true;
+            } else {
+              console.log(`요청한 좌석이 이미 차있음: ${team} 팀의 ${index} 자리`);
+            }
           } else {
-            // 자리가 이미 차있는 경우 대기실로 이동
+            console.log('유효하지 않은 좌석 정보:', stats.seatInfo);
+          }
+        }
+        
+        // 저장된 좌석으로 배치가 안 됐고, 기존 자리도 없으면 새 자리 배정
+        if (!seatAssigned) {
+          // 자리 업데이트
+          if (foundPlayer.team && foundPlayer.index !== null) {
+            if (room.gameState[foundPlayer.team][foundPlayer.index] === null) {
+              // 기존 자리가 비어있으면 그 자리에 배치
+              room.gameState[foundPlayer.team][foundPlayer.index] = foundPlayer;
+            } else {
+              // 자리가 이미 차있는 경우 대기실로 이동
+              foundPlayer.team = 'waiting';
+              const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
+              if (emptySeatIndex !== -1) {
+                room.gameState.waiting[emptySeatIndex] = foundPlayer;
+                foundPlayer.index = emptySeatIndex;
+              }
+            }
+          } else {
+            // 기존 자리가 없으면 대기실로 이동
             foundPlayer.team = 'waiting';
             const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
             if (emptySeatIndex !== -1) {
@@ -255,7 +297,8 @@ io.on('connection', (socket) => {
       nickname: nickname
     };
     
-    room.gameState.players.set(socket.id, {
+    // 새 플레이어 객체 생성
+    const newPlayer = {
       id: socket.id,
       nickname: nickname,
       team: 'waiting',
@@ -263,13 +306,44 @@ io.on('connection', (socket) => {
       champion: null,
       stats: playerStats,
       isHost: socket.id === room.gameState.host
-    });
+    };
     
-    // 빈 대기실 자리 찾기
-    const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
-    if (emptySeatIndex !== -1) {
-      room.gameState.waiting[emptySeatIndex] = room.gameState.players.get(socket.id);
-      room.gameState.players.get(socket.id).index = emptySeatIndex;
+    room.gameState.players.set(socket.id, newPlayer);
+    
+    // 좌석 정보가 있는 경우 해당 좌석으로 배치
+    let seatAssigned = false;
+    if (stats.seatInfo && stats.seatInfo.team && stats.seatInfo.index !== undefined) {
+      const { team, index } = stats.seatInfo;
+      
+      // 유효한 팀과 인덱스인지 확인
+      if ((team === 'team1' || team === 'team2' || team === 'waiting') && 
+          index >= 0 && 
+          index < (team === 'waiting' ? 10 : 5)) {
+        
+        // 해당 좌석이 비어있는지 확인
+        if (room.gameState[team][index] === null) {
+          console.log(`저장된 좌석으로 배치: ${team} 팀의 ${index} 자리`);
+          newPlayer.team = team;
+          newPlayer.index = index;
+          room.gameState[team][index] = newPlayer;
+          seatAssigned = true;
+        } else {
+          console.log(`요청한 좌석이 이미 차있음: ${team} 팀의 ${index} 자리`);
+        }
+      } else {
+        console.log('유효하지 않은 좌석 정보:', stats.seatInfo);
+      }
+    }
+    
+    // 좌석이 할당되지 않았으면 대기실에 배치
+    if (!seatAssigned) {
+      console.log('빈 대기실 자리 찾기');
+      const emptySeatIndex = room.gameState.waiting.findIndex(seat => seat === null);
+      if (emptySeatIndex !== -1) {
+        newPlayer.team = 'waiting';
+        newPlayer.index = emptySeatIndex;
+        room.gameState.waiting[emptySeatIndex] = newPlayer;
+      }
     }
     
     // 클라이언트에 통계 정보 업데이트 전송
@@ -304,12 +378,15 @@ io.on('connection', (socket) => {
   // 방 상태 확인
   socket.on('check-room', () => {
     const hasRoom = rooms.size > 0;
+    console.log(`방 상태 확인 요청: ${hasRoom ? '방 있음' : '방 없음'}`);
     socket.emit('room-status', hasRoom);
   });
 
   // 방 생성
   socket.on('create-room', ({ name, stats }) => {
+    // 방이 이미 있는 경우, 방 상태 확인 이벤트 발생
     if (rooms.size > 0) {
+      console.log("방이 이미 있어 생성 요청 무시, 방 상태 응답");
       socket.emit('room-status', true);
       return;
     }
@@ -378,6 +455,8 @@ io.on('connection', (socket) => {
 
     rooms.set(roomId, room);
     socket.join(roomId);
+    
+    // 게임 상태 전송
     socket.emit('game-state', room.gameState);
     
     // 호스트에게 게임 시작 버튼 활성화
@@ -385,6 +464,11 @@ io.on('connection', (socket) => {
     
     // 통계 정보 업데이트 전송
     socket.emit('player-stats-updated', playerStats);
+    
+    // 방 생성 성공 이벤트 전송
+    socket.emit('room-created');
+    
+    console.log('방 생성 완료 및 이벤트 전송:', roomId);
   });
 
   // 방 입장
@@ -825,30 +909,43 @@ io.on('connection', (socket) => {
     room.gameState.players.forEach(player => {
       player.champion = null;
       
-      // 패배한 팀에게 리롤 횟수 1회 추가 및 승패 기록
-      if (winningTeam && player.team) {
-        if (player.team !== winningTeam) {
-          // 패배 처리
-          if (player.stats) {
-            player.stats.rerollCount = (player.stats.rerollCount || 0) + 1;
-            player.stats.lose = (player.stats.lose || 0) + 1;
-            console.log(`패배 처리: ${player.nickname} - 패배 ${player.stats.lose}회, 리롤 ${player.stats.rerollCount}회`);
-          }
-          
-          // 리롤 횟수 추가 알림 전송
-          const playerSocket = io.sockets.sockets.get(player.id);
-          if (playerSocket) {
-            playerSocket.emit('reroll-bonus', {
-              message: '패배 보상: 리롤 횟수 +1',
-              newCount: player.stats ? player.stats.rerollCount : 1
-            });
-          }
-        } else if (player.team === winningTeam) {
-          // 승리 처리
-          if (player.stats) {
-            player.stats.win = (player.stats.win || 0) + 1;
-            console.log(`승리 처리: ${player.nickname} - 승리 ${player.stats.win}회`);
-          }
+      // 대기실에 있는 플레이어는 승패 처리에서 제외
+      if (player.team === 'waiting') {
+        return;
+      }
+      
+      // 승리/패배에 따른 리롤 보상 처리
+      if (player.team !== winningTeam) {
+        // 패배 처리
+        if (player.stats) {
+          player.stats.rerollCount = (player.stats.rerollCount || 0) + 2; // 패배 시 리롤 2회 추가
+          player.stats.lose = (player.stats.lose || 0) + 1;
+          console.log(`패배 처리: ${player.nickname} - 패배 ${player.stats.lose}회, 리롤 ${player.stats.rerollCount}회`);
+        }
+        
+        // 리롤 횟수 추가 알림 전송
+        const playerSocket = io.sockets.sockets.get(player.id);
+        if (playerSocket) {
+          playerSocket.emit('reroll-bonus', {
+            message: '패배 보상: 리롤 횟수 +2',
+            newCount: player.stats ? player.stats.rerollCount : 2
+          });
+        }
+      } else if (player.team === winningTeam) {
+        // 승리 처리
+        if (player.stats) {
+          player.stats.rerollCount = (player.stats.rerollCount || 0) + 1; // 승리 시 리롤 1회 추가
+          player.stats.win = (player.stats.win || 0) + 1;
+          console.log(`승리 처리: ${player.nickname} - 승리 ${player.stats.win}회, 리롤 ${player.stats.rerollCount}회`);
+        }
+        
+        // 리롤 횟수 추가 알림 전송
+        const playerSocket = io.sockets.sockets.get(player.id);
+        if (playerSocket) {
+          playerSocket.emit('reroll-bonus', {
+            message: '승리 보상: 리롤 횟수 +1',
+            newCount: player.stats ? player.stats.rerollCount : 1
+          });
         }
       }
     });

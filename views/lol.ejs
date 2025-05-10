@@ -1235,6 +1235,133 @@
     // 서버에서 전달받은 champions 배열을 전역 변수로 정의
     const champions = JSON.parse('<%- JSON.stringify(champions || []) %>');
     
+    // SharedWorker 생성 및 소켓 연결 관리
+    let socketWorker;
+    let socketPort;
+    let socket = {
+      id: null,
+      emit: function(event, data) {
+        socketPort.postMessage({ type: 'emit', event, data });
+      },
+      on: function() {},  // 이벤트 리스너는 아래에서 처리
+    };
+
+    // SharedWorker 초기화
+    function initSocketWorker() {
+      try {
+        socketWorker = new SharedWorker('/socket-worker.js');
+        socketPort = socketWorker.port;
+
+        // 워커로부터의 메시지 처리
+        socketPort.onmessage = function(e) {
+          const message = e.data;
+          
+          if (message.type === 'socket_event') {
+            const event = message.event;
+            const data = message.data;
+
+            // 이벤트 핸들러 호출
+            const handlers = eventHandlers[event] || [];
+            handlers.forEach(handler => handler(data));
+
+            // 소켓 ID 업데이트
+            if (event === 'connect') {
+              socket.id = data;
+              console.log('서버에 연결되었습니다. 소켓 ID:', socket.id);
+              
+              // 소켓 ID를 로컬 스토리지에 저장
+              const prevSocketId = localStorage.getItem('socketId');
+              localStorage.setItem('socketId', socket.id);
+              
+              // 이전에 저장된 통계 정보가 있으면 서버에 전송
+              const savedStats = localStorage.getItem('playerStats1');
+              if (savedStats) {
+                const stats = JSON.parse(savedStats);
+                // 소켓 ID가 변경된 경우(재접속) 기존 통계 정보를 서버에 전송
+                if (prevSocketId !== socket.id) {
+                  console.log('재접속 감지: 통계 정보 전송');
+                  
+                  // 저장된 좌석 정보 확인
+                  const seatInfo = getSeatInfo();
+                  if (seatInfo) {
+                    console.log('저장된 좌석 정보:', seatInfo);
+                    stats.seatInfo = seatInfo; // 좌석 정보 추가
+                    
+                    // 재접속 시 좌석 정보가 있을 때 토스트 알림 표시
+                    Toastify({
+                      text: `재접속 감지: ${getTeamDisplayName(seatInfo.team)} ${seatInfo.index + 1}번 자리로 자동 접속합니다.`,
+                      duration: 3000,
+                      gravity: "top",
+                      position: "center",
+                      style: {
+                        background: "linear-gradient(to right, #00b09b, #96c93d)",
+                        color: "white",
+                        fontWeight: "bold",
+                        fontSize: "14px",
+                        padding: "12px",
+                        borderRadius: "5px"
+                      }
+                    }).showToast();
+                  } else {
+                    // 좌석 정보 없이 재접속할 때 토스트 알림
+                    Toastify({
+                      text: "재접속 감지: 대기실에 배치됩니다.",
+                      duration: 3000,
+                      gravity: "top",
+                      position: "center",
+                      style: {
+                        background: "linear-gradient(to right, #3498db, #2980b9)",
+                        color: "white",
+                        fontWeight: "bold",
+                        fontSize: "14px",
+                        padding: "12px",
+                        borderRadius: "5px"
+                      }
+                    }).showToast();
+                  }
+                  
+                  socket.emit('reconnect-player', stats);
+                }
+              }
+              
+              // 이미 방 생성 중이 아닐 때만 방 상태 체크
+              if (!isCreatingRoom && !hasJoined) {
+                socket.emit('check-room');
+              }
+            }
+          }
+        };
+
+        // 워커 초기화 메시지 전송
+        socketPort.postMessage({ type: 'init' });
+        socketPort.start();
+      } catch (error) {
+        console.error('SharedWorker 초기화 실패:', error);
+        alert('브라우저가 지원하지 않아 서버 연결에 실패했습니다. 크롬 브라우저를 사용해주세요.');
+      }
+    }
+
+    // 이벤트 핸들러 저장소
+    const eventHandlers = {};
+
+    // 이벤트 리스너 등록 함수 재정의
+    socket.on = function(event, handler) {
+      if (!eventHandlers[event]) {
+        eventHandlers[event] = [];
+      }
+      eventHandlers[event].push(handler);
+    };
+
+    // SharedWorker 초기화 실행
+    initSocketWorker();
+
+    // 페이지 언로드 시 정리
+    window.addEventListener('unload', () => {
+      if (socketPort) {
+        socketPort.close();
+      }
+    });
+    
     // 한글 챔피언 이름 매핑
     const koreanChampionNames = {
       'Aatrox': '아트록스',
@@ -1419,7 +1546,6 @@
       return koreanName; // 매칭되는 영문 이름이 없으면 입력값 그대로 반환
     }
     
-    const socket = io();
     let isHost = false;
     let rerollCount = 2;
     let currentChampion = '';
@@ -1444,7 +1570,7 @@
     };
     
     // 현재 공지사항 버전 - 업데이트마다 숫자를 올려주세요
-    const NOTICE_VERSION = "1.2";
+    const NOTICE_VERSION = "1.3";
 
     // 쿠키 설정 함수
     function setCookie(name, value, days) {
@@ -1469,10 +1595,50 @@
       return null;
     }
 
+    // 특정 쿠키 삭제 함수
+    function deleteCookie(name) {
+      document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/;';
+    }
+
+    // 플레이어 좌석 정보 저장 함수
+    function saveSeatInfo(team, index) {
+      // 좌석 정보를 JSON으로 저장
+      const seatInfo = JSON.stringify({
+        team: team,
+        index: index,
+        timestamp: Date.now()
+      });
+      
+      // 쿠키에 1시간 만료로 저장 (days = 1/24)
+      setCookie("playerSeat", seatInfo, 1/24);
+    }
+
+    // 플레이어 좌석 정보 가져오기 함수
+    function getSeatInfo() {
+      const seatInfoStr = getCookie("playerSeat");
+      if (!seatInfoStr) return null;
+      
+      try {
+        const seatInfo = JSON.parse(seatInfoStr);
+        
+        // 유효 시간 확인 (1시간 = 3600000 밀리초)
+        const now = Date.now();
+        if (now - seatInfo.timestamp > 3600000) {
+          deleteCookie("playerSeat");
+          return null;
+        }
+        
+        return seatInfo;
+      } catch (e) {
+        deleteCookie("playerSeat");
+        return null;
+      }
+    }
+
     // 플레이어 통계 초기화 함수
     function initPlayerStats() {
       // 로컬 스토리지에서 통계 확인
-      const savedStats = localStorage.getItem('playerStats');
+      const savedStats = localStorage.getItem('playerStats1');
       
       if (savedStats) {
         // 저장된 통계가 있다면 불러오기
@@ -1492,7 +1658,7 @@
           rerollCount: 2
         };
         // 로컬 스토리지에 저장
-        localStorage.setItem('playerStats', JSON.stringify(playerStats));
+        localStorage.setItem('playerStats1', JSON.stringify(playerStats));
         console.log('새 플레이어 통계 정보 생성:', playerStats);
       }
       
@@ -1510,7 +1676,7 @@
     
     // 플레이어 통계 저장 함수 (로컬에만 저장)
     function savePlayerStats() {
-      localStorage.setItem('playerStats', JSON.stringify(playerStats));
+      localStorage.setItem('playerStats1', JSON.stringify(playerStats));
     }
     
     // 페이지 로드 시 쿠키에서 테마 설정 읽기
@@ -1596,22 +1762,66 @@
     // 초기 화면 설정
     socket.on('connect', () => {
       console.log('서버에 연결되었습니다. 소켓 ID:', socket.id);
+      
       // 소켓 ID를 로컬 스토리지에 저장
       const prevSocketId = localStorage.getItem('socketId');
       localStorage.setItem('socketId', socket.id);
       
       // 이전에 저장된 통계 정보가 있으면 서버에 전송
-      const savedStats = localStorage.getItem('playerStats');
+      const savedStats = localStorage.getItem('playerStats1');
+      let stats = null;
+      
       if (savedStats) {
-        const stats = JSON.parse(savedStats);
+        stats = JSON.parse(savedStats);
         // 소켓 ID가 변경된 경우(재접속) 기존 통계 정보를 서버에 전송
         if (prevSocketId !== socket.id) {
           console.log('재접속 감지: 통계 정보 전송');
+          
+          // 저장된 좌석 정보 확인
+          const seatInfo = getSeatInfo();
+          if (seatInfo) {
+            console.log('저장된 좌석 정보:', seatInfo);
+            stats.seatInfo = seatInfo; // 좌석 정보 추가
+            
+            // 재접속 시 좌석 정보가 있을 때 토스트 알림 표시
+            Toastify({
+              text: `재접속 감지: ${getTeamDisplayName(seatInfo.team)} ${seatInfo.index + 1}번 자리로 자동 접속합니다.`,
+              duration: 3000,
+              gravity: "top",
+              position: "center",
+              style: {
+                background: "linear-gradient(to right, #00b09b, #96c93d)",
+                color: "white",
+                fontWeight: "bold",
+                fontSize: "14px",
+                padding: "12px",
+                borderRadius: "5px"
+              }
+            }).showToast();
+          } else {
+            // 좌석 정보 없이 재접속할 때 토스트 알림
+            Toastify({
+              text: "재접속 감지: 대기실에 배치됩니다.",
+              duration: 3000,
+              gravity: "top",
+              position: "center",
+              style: {
+                background: "linear-gradient(to right, #3498db, #2980b9)",
+                color: "white",
+                fontWeight: "bold",
+                fontSize: "14px",
+                padding: "12px",
+                borderRadius: "5px"
+              }
+            }).showToast();
+          }
+          
           socket.emit('reconnect-player', stats);
         }
       }
       
-      if (!hasJoined) {
+      // 이미 방 생성 중이 아닐 때만 방 상태 체크
+      if (!isCreatingRoom && !hasJoined) {
         socket.emit('check-room');
       }
     });
@@ -1656,29 +1866,51 @@
       socket.emit('update-player-stats', playerStats);
     });
 
+    // 팀 이름을 표시 이름으로 변환하는 함수
+    function getTeamDisplayName(team) {
+      if (team === 'team1') return '팀 1';
+      if (team === 'team2') return '팀 2';
+      return '대기실';
+    }
+
+    // 방 생성 중 상태 관리 변수
+    let isCreatingRoom = false;
+
     // 방 상태 확인
     socket.on('room-status', (hasRoom) => {
       if (hasRoom) {
         // 방이 있으면 자동으로 입장
-        if (hasJoined) {
-          console.log('이미 참여한 상태로 방 재입장');
-        } else {
+        if (!hasJoined) {
           console.log('새로운 플레이어로 방 입장');
           hasJoined = true;
           localStorage.setItem('hasJoined', 'true');
+          socket.emit('join-room');
+        } else {
+          console.log('이미 참여한 상태로 방 재입장');
         }
-        socket.emit('join-room');
         document.getElementById('gameRoom').style.display = 'block';
         document.getElementById('resetRoomBtn').disabled = false;
+        
+        // 방 생성 중 상태 초기화
+        isCreatingRoom = false;
       } else {
-        // 방이 없으면 호스트 비밀번호 입력 및 hasJoined 초기화
+        // 방이 없으면 무조건 hasJoined 초기화하고 방 생성 프로세스 시작
         console.log('방이 없습니다. 생성 프로세스 시작');
         hasJoined = false;
         localStorage.removeItem('hasJoined');
+        document.getElementById('gameRoom').style.display = 'none';
+        
+        // 이미 방 생성 중이면 중복 프롬프트 방지
+        if (isCreatingRoom) {
+          console.log('이미 방 생성 중입니다. 중복 프롬프트 방지');
+          return;
+        }
+        
+        // 방 생성 중 상태로 설정
+        isCreatingRoom = true;
         
         const password = prompt('생성된 방이 없습니다 방을 생성하려면 비밀번호를 입력해주세요!');
         if (password === 'star') {
-          // 방 생성 시 현재 플레이어 통계 정보도 함께 전송
           console.log('방 생성 시 전송할 통계 정보:', playerStats);
           socket.emit('create-room', { 
             name: '롤 랜덤 챔피언 뽑기',
@@ -1688,12 +1920,13 @@
           hasJoined = true;
           localStorage.setItem('hasJoined', 'true');
           
-          // 닉네임과 상태 표시 업데이트
           document.getElementById('nicknameInput').placeholder = playerStats.nickname;
           document.getElementById('gameRoom').style.display = 'block';
           document.getElementById('resetGameBtn').disabled = false;
           document.getElementById('resetRoomBtn').disabled = false;
         } else {
+          // 방 생성 취소 시 상태 초기화
+          isCreatingRoom = false;
           alert('호스트 비밀번호가 틀렸습니다. 페이지를 새로고침하세요.');
         }
       }
@@ -1759,10 +1992,15 @@
               const selectedTeam = containerId.includes('team1') ? 'team1' : 
                                  containerId.includes('team2') ? 'team2' : 'waiting';
               socket.team = selectedTeam;
+              
+              // 소켓 이벤트 전송
               socket.emit('select-seat', {
                 team: selectedTeam,
                 index
               });
+              
+              // 자리 선택 시 쿠키에 좌석 정보 저장
+              saveSeatInfo(selectedTeam, index);
               
               // 자리 선택 시 진행 중인 애니메이션 클래스를 모두 제거
               document.querySelectorAll('.seat.moving').forEach(el => {
@@ -1817,8 +2055,15 @@
 
     // 게임 상태 업데이트
     socket.on('game-state', (state) => {
+      // 게임 상태 수신 시 게임 화면 표시 확인
+      if (hasJoined && document.getElementById('gameRoom').style.display === 'none') {
+        console.log('게임 상태 수신 시 게임룸이 숨겨져 있어 표시로 변경');
+        document.getElementById('gameRoom').style.display = 'block';
+      }
+      
       // 게임 시작 여부 확인 (챔피언이 할당된 플레이어가 있는지 확인)
       gameStarted = [...state.team1, ...state.team2].some(player => player && player.champion);
+      
       
       // 밴 단계 활성화 여부 확인
       const isBanPhaseActive = document.querySelector('.teams-container').classList.contains('ban-mode');
@@ -2224,11 +2469,25 @@
     socket.on('host-changed', (isNewHost) => {
       isHost = isNewHost;
       if (isHost) {
+        console.log('호스트 권한 획득');
+        
+        // 호스트가 되었을 때 게임룸이 숨겨져 있다면 표시
+        if (document.getElementById('gameRoom').style.display === 'none') {
+          console.log('호스트 권한 획득 시 게임룸이 숨겨져 있어 표시로 변경');
+          document.getElementById('gameRoom').style.display = 'block';
+        }
+        
         document.getElementById('resetGameBtn').disabled = false;
+        document.getElementById('resetRoomBtn').disabled = false;
+        
         // 호스트면 밴 컨트롤 표시
         if (!gameStarted) {
           document.getElementById('banPhaseControls').style.display = 'flex';
         }
+        
+        // 호스트 변경 시 참여 상태 업데이트
+        hasJoined = true;
+        localStorage.setItem('hasJoined', 'true');
         
         Toastify({
           text: "호스트 권한이 부여되었습니다!",
@@ -2558,7 +2817,6 @@
         }
       }).showToast();
     });
-
     // 공지사항 표시 함수
     function showNotice() {
       // 이미 본 공지사항인지 확인
@@ -2572,28 +2830,16 @@
       modal.className = 'notice-modal';
       modal.innerHTML = `
         <div class="notice-modal-content">
-          <div class="notice-title">업데이트 안내</div>
+          <div class="notice-title">업데이트 안내 <small>(2025.05.11)</small></div>
           <div class="notice-content">
             <div class="notice-update-item">
-              <b>밴 모드 추가</b>: 밴 모드가 추가되었습니다. 각 팀에서 밴 할 챔피언을 선택할 수 있습니다.
+              <b>자리 저장</b>: 자리 저장 기능이 추가되어 알트탭시 연결이 끊겨도 재접속시 기존 자리에 배치됩니다.
             </div>
             <div class="notice-update-item">
-              <b>플레이어 통계 시스템 추가</b>: 이제 각 플레이어의 승리, 패배, 승률이 표시됩니다.
+              <b>리롤 지급 시스템 변경</b>: 기존에 패배팀에게만 지급되었던 리롤 보너스가 승리팀에게 1회, 패배팀에게 2회 지급됩니다.
             </div>
             <div class="notice-update-item">
-              <b>재접속 기능 개선</b>: 페이지를 새로고침하거나 브라우저를 재시작해도 닉네임이 유지됩니다.
-            </div>
-            <div class="notice-update-item">
-              <b>랜덤 배정 기능 추가</b>: 호스트는 이제 대기실의 플레이어들을 랜덤으로 두 팀에 배정할 수 있습니다. (팀칸에 이미 플레이어가 있으면 비활성화됩니다)
-            </div>
-            <div class="notice-update-item">
-              <b>승리/패배 팀 선택</b>: 게임 종료 후 호스트가 승리 팀을 선택하면 패배 팀은 리롤 횟수 +1을 보상으로 받습니다.
-            </div>
-            <div class="notice-update-item">
-              <b>리롤 시스템 개선</b>: 리롤 횟수가 플레이어마다 지급 및 저장됩니다. 새 플레이어는 기본 2회의 리롤을 갖습니다.
-            </div>
-            <div class="notice-update-item">
-              <b>다크 모드 설정 저장</b>: 테마 설정 저장되어 브라우저를 닫았다가 다시 열어도 설정이 유지됩니다.
+              <b>초기화</b>: 리롤 지급 시스템 변경으로 인해 플레이어 정보를 모두 초기화했습니다.
             </div>
           </div>
           <div class="notice-buttons">
@@ -3227,6 +3473,35 @@
           }
         }
       }
+    });
+    
+    // 방 생성 성공 응답 처리
+    socket.on('room-created', () => {
+      console.log('방 생성 성공 응답 수신');
+      isCreatingRoom = false;
+      hasJoined = true;
+      localStorage.setItem('hasJoined', 'true');
+      
+      // 방 생성 성공 시 게임룸 표시
+      document.getElementById('gameRoom').style.display = 'block';
+      document.getElementById('resetGameBtn').disabled = false;
+      document.getElementById('resetRoomBtn').disabled = false;
+      
+      // 알림 메시지
+      Toastify({
+        text: "방 생성이 완료되었습니다!",
+        duration: 2000,
+        gravity: "top",
+        position: "center",
+        style: {
+          background: "linear-gradient(to right, #00b09b, #96c93d)",
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "14px",
+          padding: "12px",
+          borderRadius: "5px"
+        }
+      }).showToast();
     });
   </script>
 </body>
