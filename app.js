@@ -1513,6 +1513,7 @@ app.get('/', (req, res) => {
     if(selectedMonth === "" && months.size > 0) {
       selectedMonth = months.values().next().value;
     }
+    console.log(req.user);
     res.render('gallery', { 
       groupedImages,
       months: Array.from(months).sort().reverse(),
@@ -1935,6 +1936,57 @@ app.delete('/api/comments/:id', (req, res) => {
       }
 
       res.status(204).send();
+    });
+  });
+});
+
+// 회원탈퇴 API
+app.delete('/api/users/withdraw', (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: '로그인이 필요합니다.' });
+  }
+
+  const userId = req.user.id;
+
+  // 트랜잭션 시작
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
+
+    // 1. 해당 사용자가 작성한 댓글 모두 삭제
+    db.run('DELETE FROM comments WHERE userId = ?', [userId], (err) => {
+      if (err) {
+        console.error('댓글 삭제 중 오류:', err);
+        db.run('ROLLBACK');
+        return res.status(500).json({ error: '회원탈퇴 처리 중 오류가 발생했습니다.' });
+      }
+
+      // 2. 사용자 정보 삭제
+      db.run('DELETE FROM users WHERE id = ?', [userId], (err) => {
+        if (err) {
+          console.error('사용자 정보 삭제 중 오류:', err);
+          db.run('ROLLBACK');
+          return res.status(500).json({ error: '회원탈퇴 처리 중 오류가 발생했습니다.' });
+        }
+
+        // 트랜잭션 커밋
+        db.run('COMMIT', (err) => {
+          if (err) {
+            console.error('트랜잭션 커밋 중 오류:', err);
+            db.run('ROLLBACK');
+            return res.status(500).json({ error: '회원탈퇴 처리 중 오류가 발생했습니다.' });
+          }
+
+          // 세션 종료
+          req.logout((err) => {
+            if (err) {
+              console.error('로그아웃 중 오류:', err);
+              return res.status(500).json({ error: '로그아웃 처리 중 오류가 발생했습니다.' });
+            }
+            console.log(`사용자 ${userId} 회원탈퇴 완료`);
+            res.status(200).json({ message: '회원탈퇴가 완료되었습니다.' });
+          });
+        });
+      });
     });
   });
 });

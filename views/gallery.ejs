@@ -938,16 +938,73 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            position: relative;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .user-info:hover {
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .user-avatar {
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
         }
 
         .user-name {
             font-weight: 500;
+            margin-right: 4px;
+        }
+
+        .user-menu-toggle {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+
+        .user-info.active .user-menu-toggle {
+            transform: rotate(180deg);
+        }
+
+        .user-menu {
+            position: absolute;
+            top: 45px;
+            right: 0;
+            width: 150px;
+            background: rgba(10, 25, 47, 0.95);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            z-index: 100;
+            display: none;
+            transform: translateY(-10px);
+            opacity: 0;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .user-menu.active {
+            display: block;
+            transform: translateY(0);
+            opacity: 1;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .user-menu-item {
+            padding: 12px 15px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .logout-button {
@@ -1337,6 +1394,260 @@
                 right: 10px;
             }
         }
+
+        /* 회원탈퇴 모달 스타일 */
+        .withdraw-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .withdraw-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .withdraw-form {
+            background: rgba(10, 25, 47, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 450px;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .withdraw-modal.active .withdraw-form {
+            transform: translateY(0);
+        }
+
+        .withdraw-form h3 {
+            color: white;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        .withdraw-form p {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .withdraw-form .buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .withdraw-form button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .withdraw-form button.cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .withdraw-form button.cancel:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .withdraw-form button.confirm {
+            background: #e53935;
+            color: white;
+        }
+
+        .withdraw-form button.confirm:hover {
+            background: #d32f2f;
+            transform: translateY(-1px);
+        }
+
+        /* 정책 관련 스타일 */
+        .policy-button {
+            display: block;
+            text-align: center;
+            padding: 12px;
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            border: none;
+            width: 100%;
+        }
+
+        .policy-button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        .policy-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .policy-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .policy-content {
+            background: rgba(10, 25, 47, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .policy-modal.active .policy-content {
+            transform: translateY(0);
+        }
+
+        .policy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .policy-header h2 {
+            color: white;
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        .policy-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .policy-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .policy-tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 2px;
+        }
+
+        .policy-tab {
+            padding: 10px 16px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            font-size: 0.9rem;
+        }
+
+        .policy-tab.active {
+            color: white;
+            border-bottom: 2px solid #5865F2;
+        }
+
+        .policy-tab:hover {
+            color: white;
+        }
+
+        .policy-body {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.6;
+        }
+
+        .policy-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .policy-section.active {
+            display: block;
+        }
+
+        .policy-section h3 {
+            color: white;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .policy-section p {
+            margin-bottom: 1rem;
+        }
+
+        .policy-section ul {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+        }
+
+        .policy-section li {
+            margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 600px) {
+            .policy-tab {
+                padding: 8px 12px;
+                font-size: 0.8rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1347,14 +1658,32 @@
         </div>
         <div class="auth-buttons">
             <% if (user) { %>
-                <div class="user-info">
-                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="프로필" class="user-avatar">
+                <div class="user-info" onclick="toggleUserMenu()">
+                    <img src="<%= user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : '/discord.png' %>" alt="프로필" class="user-avatar">
                     <span class="user-name"><%= user.global_name %></span>
-                    <a href="/auth/logout" class="logout-button">로그아웃</a>
+                    <span class="user-menu-toggle">▼</span>
+                    <div class="user-menu" id="userMenu">
+                        <div class="user-menu-item danger" onclick="showWithdrawModal()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                                <path d="M13 2v7h7"></path>
+                                <path d="M17 21l-5-5 5-5"></path>
+                            </svg>
+                            회원탈퇴
+                        </div>
+                        <div class="user-menu-item" onclick="location.href='/auth/logout'">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            로그아웃
+                        </div>
+                    </div>
                 </div>
             <% } else { %>
                 <a href="/auth/discord" class="discord-login-button">
-                    <img src="https://i.namu.wiki/i/kwY61GCWCLc2ri9cR_HIKspKdE2UznkEK65xENk3kOPnNkU1T4EbH25DbgkATrWwyKXhPETE8rVUMCjZRgdR6LPnPa1EecuFBvc6vivm9wQRg25EaaIG9vPAWKZi_DKf8mnVedjP1s7LEvQarC5sFQ.webp" alt="Discord">
+                    <img src="/discord.png" alt="Discord">
                     Discord로 로그인
                 </a>
             <% } %>
@@ -1375,7 +1704,9 @@
                     <%= month.replace(/(\d{4})-(\d{2})/, '$1년 $2월') %>
                 </li>
             <% }); %>
+            <li class="month-item"></li>
         </ul>
+        <button class="policy-button" onclick="showPolicyModal()">이용약관 및 정책</button>
     </div>
 
     <div class="main-content">
@@ -1493,6 +1824,135 @@
                 <div class="edit-buttons">
                     <button onclick="updateDescription()">저장</button>
                     <button onclick="cancelEdit()">취소</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 회원탈퇴 모달 -->
+    <div class="withdraw-modal" id="withdrawModal">
+        <div class="withdraw-form">
+            <h3>회원탈퇴</h3>
+            <p>정말 탈퇴하시겠습니까? 탈퇴하면 작성한 댓글 및 모든 정보가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p>
+            <div class="buttons">
+                <button class="cancel" onclick="closeWithdrawModal()">취소</button>
+                <button class="confirm" onclick="withdrawUser()">탈퇴하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 이용약관 및 정책 모달 -->
+    <div class="policy-modal" id="policyModal">
+        <div class="policy-content">
+            <div class="policy-header">
+                <h2>이용약관 및 정책</h2>
+                <button class="policy-close" onclick="closePolicyModal()">×</button>
+            </div>
+            <div class="policy-tabs">
+                <button class="policy-tab active" onclick="switchPolicyTab('terms')">서비스 이용약관</button>
+                <button class="policy-tab" onclick="switchPolicyTab('cookie')">쿠키 정책</button>
+                <button class="policy-tab" onclick="switchPolicyTab('email')">이메일 수집 거부</button>
+                <button class="policy-tab" onclick="switchPolicyTab('copyright')">저작권 정책</button>
+                <button class="policy-tab" onclick="switchPolicyTab('marketing')">마케팅 정보 수신</button>
+                <button class="policy-tab" onclick="switchPolicyTab('privacy')">개인정보 제3자 제공</button>
+            </div>
+            <div class="policy-body">
+                <div id="terms" class="policy-section active">
+                    <h3>서비스 이용약관</h3>
+                    <p>이 약관은 별단 추억갤러리 서비스 이용에 관한 기본적인 사항을 규정합니다.</p>
+                    
+                    <h3>제1조 (목적)</h3>
+                    <p>이 약관은 별단 추억갤러리(이하 "갤러리")에서 제공하는 서비스 이용조건 및 절차, 회원과 갤러리 간의 권리, 의무, 책임사항을 규정함을 목적으로 합니다.</p>
+                    
+                    <h3>제2조 (가입 및 탈퇴)</h3>
+                    <p>1. 회원 가입은 Discord 계정을 통해 이루어지며, 별단 길드 멤버만 서비스를 이용할 수 있습니다.</p>
+                    <p>2. 회원은 언제든지 자신의 계정에서 "회원탈퇴" 기능을 이용하여 탈퇴할 수 있습니다. 탈퇴 시 회원이 작성한 모든 댓글과 개인정보는 즉시 삭제됩니다.</p>
+                    
+                    <h3>제3조 (서비스 이용 제한)</h3>
+                    <p>다음과 같은 경우 서비스 이용이 제한될 수 있습니다:</p>
+                    <ul>
+                        <li>타인의 권리를 침해하거나 명예를 훼손하는 내용을 게시한 경우</li>
+                        <li>불법적인 내용을 게시하는 경우</li>
+                        <li>서비스의 안정적 운영을 방해하는 경우</li>
+                    </ul>
+                    
+                    <h3>제4조 (면책 조항)</h3>
+                    <p>갤러리는 천재지변, 전쟁, 기간통신사업자의 서비스 중단 등 불가항력적인 사유로 인한 서비스 중단에 대해 책임을 지지 않습니다.</p>
+                    
+                    <h3>제5조 (분쟁 해결)</h3>
+                    <p>서비스 이용과 관련하여 발생한 분쟁은 대한민국 법률에 따라 규율되며, 소송이 제기될 경우 관할법원은 서울중앙지방법원으로 합니다.</p>
+                </div>
+                
+                <div id="cookie" class="policy-section">
+                    <h3>쿠키 정책</h3>
+                    <p>별단 추억갤러리는 서비스 제공을 위해 쿠키와 로컬 스토리지를 사용합니다.</p>
+                    
+                    <h3>1. 쿠키란?</h3>
+                    <p>쿠키는 웹사이트가 사용자의 브라우저에 저장하는 작은 텍스트 파일로, 사용자를 식별하고 맞춤화된 서비스를 제공하는 데 사용됩니다.</p>
+                    
+                    <h3>2. 쿠키 사용 목적</h3>
+                    <p>당사는 다음과 같은 목적으로 쿠키를 사용합니다:</p>
+                    <ul>
+                        <li>로그인 상태 유지</li>
+                        <li>사용자 세션 관리</li>
+                        <li>서비스 사용 데이터 수집 및 분석</li>
+                    </ul>
+                    
+                    <h3>3. 쿠키 설정 및 거부 방법</h3>
+                    <p>대부분의 브라우저는 쿠키를 허용하도록 기본 설정되어 있지만, 브라우저 설정을 변경하여 모든 쿠키를 허용하거나 차단하거나 쿠키가 설정될 때 알림을 받을 수 있습니다.</p>
+                    <p>쿠키 설정을 거부하는 경우 서비스 이용에 어려움이 있을 수 있습니다.</p>
+                </div>
+                
+                <div id="email" class="policy-section">
+                    <h3>이메일 무단 수집 거부</h3>
+                    <p>본 웹사이트에 게시된 이메일 주소가 전자우편 수집 프로그램이나 그 밖의 기술적 장치를 이용하여 무단으로 수집되는 것을 거부합니다.</p>
+                    <p>이를 위반하여 이메일 주소를 수집하는 행위는 '정보통신망 이용촉진 및 정보보호 등에 관한 법률'에 의해 금지되어 있으며, 위반 시 법적 조치를 취할 수 있습니다.</p>
+                </div>
+                
+                <div id="copyright" class="policy-section">
+                    <h3>저작권 및 지식재산권 정책</h3>
+                    <p>별단 추억갤러리에 게시된 모든 콘텐츠의 저작권은 다음과 같이 규정됩니다.</p>
+                    
+                    <h3>1. 서비스 콘텐츠의 저작권</h3>
+                    <p>갤러리에서 제공하는 서비스, 이미지, 디자인, 로고 등 모든 콘텐츠에 대한 저작권은 갤러리에 귀속됩니다.</p>
+                    
+                    <h3>2. 이용자 콘텐츠의 저작권</h3>
+                    <p>이용자가 갤러리에 게시한 콘텐츠의 저작권은 해당 이용자에게 있지만, 갤러리는 서비스 운영과 홍보 등을 위해 해당 콘텐츠를 이용할 수 있는 권리를 가집니다.</p>
+                    
+                    <h3>3. 저작권 침해 신고</h3>
+                    <p>저작권 침해가 우려되는 콘텐츠를 발견하신 경우, 관리자에게 신고해 주시기 바랍니다. 해당 콘텐츠는 검토 후 조치됩니다.</p>
+                </div>
+                
+                <div id="marketing" class="policy-section">
+                    <h3>광고·제휴·마케팅 정보 수신 동의</h3>
+                    <p>별단 추억갤러리는 회원에게 다양한 마케팅 정보를 제공할 수 있습니다.</p>
+                    
+                    <h3>1. 마케팅 정보의 범위</h3>
+                    <p>갤러리는 새로운 서비스, 이벤트, 프로모션 등에 관한 정보를 전송할 수 있습니다.</p>
+                    
+                    <h3>2. 마케팅 정보 전송 수단</h3>
+                    <p>마케팅 정보는 이메일, Discord 알림 등을 통해 전송될 수 있습니다.</p>
+                    
+                    <h3>3. 마케팅 정보 수신 거부 방법</h3>
+                    <p>마케팅 정보 수신은 선택 사항이며, 언제든지 수신을 거부할 수 있습니다. 수신 거부를 원하시는 경우 관리자에게 문의해 주시기 바랍니다.</p>
+                </div>
+                
+                <div id="privacy" class="policy-section">
+                    <h3>개인정보 제3자 제공 및 위탁 처리 동의</h3>
+                    <p>별단 추억갤러리는 서비스 제공을 위해 필요한 경우 개인정보를 제3자에게 제공하거나 위탁 처리할 수 있습니다.</p>
+                    
+                    <h3>1. 개인정보 제3자 제공</h3>
+                    <p>갤러리는 사용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다. 다만, 법률에 의해 요구되는 경우는 예외로 합니다.</p>
+                    
+                    <h3>2. 개인정보 위탁 처리</h3>
+                    <p>갤러리는 다음과 같은 업체에 개인정보 처리를 위탁할 수 있습니다:</p>
+                    <ul>
+                        <li>Discord (사용자 인증)</li>
+                        <li>호스팅 서비스 제공업체 (서버 관리)</li>
+                    </ul>
+                    
+                    <h3>3. 보유 기간</h3>
+                    <p>개인정보는 회원 탈퇴 시 즉시 삭제됩니다. 단, 관련 법령에 따라 보존이 필요한 경우에는 해당 기간 동안 보관될 수 있습니다.</p>
                 </div>
             </div>
         </div>
@@ -2037,6 +2497,144 @@
                     console.error('댓글 수 로딩 중 오류:', error);
                 });
         }
+
+        // 유저 메뉴 토글 함수
+        function toggleUserMenu() {
+            const userMenu = document.getElementById('userMenu');
+            const userInfo = document.querySelector('.user-info');
+            
+            userMenu.classList.toggle('active');
+            userInfo.classList.toggle('active');
+            
+            // 메뉴 외부 클릭시 닫기
+            event.stopPropagation();
+            document.addEventListener('click', function closeMenu(e) {
+                if (!userMenu.contains(e.target) && e.target.closest('.user-info') === null) {
+                    userMenu.classList.remove('active');
+                    userInfo.classList.remove('active');
+                    document.removeEventListener('click', closeMenu);
+                }
+            });
+        }
+
+        // 회원탈퇴 모달 표시
+        function showWithdrawModal() {
+            const withdrawModal = document.getElementById('withdrawModal');
+            withdrawModal.classList.add('active');
+            // 이벤트 전파 중지
+            event.stopPropagation();
+        }
+
+        // 회원탈퇴 모달 닫기
+        function closeWithdrawModal() {
+            const withdrawModal = document.getElementById('withdrawModal');
+            withdrawModal.classList.remove('active');
+        }
+
+        // 회원탈퇴 실행
+        function withdrawUser() {
+            if (confirm('정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                fetch('/api/users/withdraw', {
+                    method: 'DELETE',
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('회원탈퇴가 완료되었습니다.');
+                        window.location.href = '/';
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.error || '회원탈퇴 처리 중 오류가 발생했습니다.');
+                        });
+                    }
+                })
+                .catch(error => {
+                    alert(error.message);
+                    console.error('회원탈퇴 오류:', error);
+                });
+            }
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const withdrawModal = document.getElementById('withdrawModal');
+                if (withdrawModal.classList.contains('active')) {
+                    closeWithdrawModal();
+                }
+            }
+        });
+
+        // 모달 외부 클릭시 닫기
+        document.getElementById('withdrawModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeWithdrawModal();
+            }
+        });
+
+        // 이용약관 모달 표시
+        function showPolicyModal() {
+            const policyModal = document.getElementById('policyModal');
+            policyModal.classList.add('active');
+            // 스크롤 방지
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 이용약관 모달 닫기
+        function closePolicyModal() {
+            const policyModal = document.getElementById('policyModal');
+            policyModal.classList.remove('active');
+            // 스크롤 허용
+            document.body.style.overflow = 'auto';
+        }
+
+        // 이용약관 탭 전환
+        function switchPolicyTab(tabId) {
+            // 모든 탭 비활성화
+            document.querySelectorAll('.policy-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 모든 섹션 숨기기
+            document.querySelectorAll('.policy-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // 선택한 탭 활성화
+            document.querySelector(`.policy-tab[onclick="switchPolicyTab('${tabId}')"]`).classList.add('active');
+            
+            // 선택한 섹션 표시
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const withdrawModal = document.getElementById('withdrawModal');
+                const policyModal = document.getElementById('policyModal');
+                
+                if (withdrawModal.classList.contains('active')) {
+                    closeWithdrawModal();
+                }
+                
+                if (policyModal.classList.contains('active')) {
+                    closePolicyModal();
+                }
+            }
+        });
+
+        // 모달 외부 클릭시 닫기
+        document.getElementById('withdrawModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeWithdrawModal();
+            }
+        });
+        
+        document.getElementById('policyModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePolicyModal();
+            }
+        });
     </script>
 </body>
 </html> 
