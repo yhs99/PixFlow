@@ -609,7 +609,8 @@
   </style>
 </head>
 <body>
-  <%- include('header', { currentPath: '/rank' }) %>
+  <% const currentPath = '/rank' %>
+  <%- include('header.ejs', { currentPath }) %>
 
   <div class="container">
     <h1 class="mb-4">별단 순위표</h1>

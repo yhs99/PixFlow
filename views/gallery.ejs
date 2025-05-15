@@ -206,19 +206,20 @@
             width: 240px;
             background: rgba(10, 25, 47, 0.95);
             backdrop-filter: blur(10px);
-            padding: 20px;
+            padding: 80px 20px 20px; /* 상단 패딩을 80px로 늘려 헤더 아래에서 시작하도록 조정 */
             border-right: 1px solid rgba(255, 255, 255, 0.1);
             position: fixed;
             height: 100vh;
             left: 0;
-            top: 0;
+            top: 0; /* 최상단에 위치 */
             overflow-y: auto;
-            z-index: 1000;
+            z-index: 999; /* 헤더(z-index: 1001)보다 낮고 다른 요소보다 높게 설정 */
             transition: transform 0.3s ease;
         }
 
         .sidebar h2 {
             color: #fff;
+            margin-top: 5px;
             margin-bottom: 20px;
             text-align: center;
             text-shadow: 0 0 10px rgba(255, 192, 203, 0.5);
@@ -226,6 +227,8 @@
 
         .month-list {
             list-style: none;
+            margin-top: 10px;
+            padding-left: 0;
         }
 
         .month-item {
@@ -245,7 +248,7 @@
         }
 
         .main-content {
-            margin-top: 80px;
+            margin-top: 20px; /* 상단 마진 줄임 - 헤더로 인한 padding-top이 body에 이미 있음 */
             flex: 1;
             margin-left: 240px;
             padding: 40px;
@@ -801,7 +804,7 @@
         .menu-toggle {
             display: none;
             position: fixed;
-            top: 20px;
+            top: 70px; /* 헤더 아래에 위치하도록 조정 */
             left: 20px;
             z-index: 1001;
             background: rgba(255, 255, 255, 0.1);
@@ -819,6 +822,7 @@
         @media (max-width: 1024px) {
             .sidebar {
                 transform: translateX(-100%);
+                padding-top: 90px; /* 모바일에서 상단 패딩 약간 더 늘림 */
             }
 
             .sidebar.active {
@@ -1720,7 +1724,8 @@
     </style>
 </head>
 <body>
-    <%- include('header', { currentPath: '/' }) %>
+    <% const currentPath = '/' %>
+    <%- include('header.ejs', { currentPath }) %>
 
     <div class="header">
         <div class="auth-buttons">
