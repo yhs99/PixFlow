@@ -782,6 +782,35 @@
     </div>
   </div>
 
+  <!-- 로펙 점수 공지사항 모달 추가 -->
+  <div class="modal fade" id="noticeModal" tabindex="-1" aria-labelledby="noticeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background: rgba(10, 25, 47, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); color: white;">
+        <div class="modal-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+          <h5 class="modal-title" id="noticeModalLabel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-megaphone-fill me-2" viewBox="0 0 16 16">
+              <path d="M13 2.5a1.5 1.5 0 0 1 3 0v11a1.5 1.5 0 0 1-3 0zm-1 .724c-2.067.95-4.539 1.481-7 1.656v6.237a25.222 25.222 0 0 1 1.088.085c2.053.204 4.038.668 5.912 1.56zm-8 7.841V4.934c-.68.027-1.399.043-2.008.053A2.02 2.02 0 0 0 0 7v2c0 1.106.896 1.996 1.994 2.009a68.14 68.14 0 0 1 .496.008 64 64 0 0 1 1.51.048zm1.39 1.081c.285.021.569.047.85.078l.253 1.69a1 1 0 0 1-.983 1.187h-.548a1 1 0 0 1-.916-.599l-1.314-2.48a65.81 65.81 0 0 1 1.692.064c.327.017.65.037.966.06z"/>
+            </svg>
+            알려드립니다
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p style="line-height: 1.6;">📢 현재 로펙 점수를 활용한 순위표 제공을 위해 로펙 개발자분과 협의 중에 있습니다. 협의가 완료되는 대로, 로펙 데이터를 바탕으로 한 정확한 순위 조정을 진행할 예정입니다.</p>
+        </div>
+        <div class="modal-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.1);">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="doNotShowAgain">
+            <label class="form-check-label" for="doNotShowAgain" style="color: rgba(255, 255, 255, 0.7);">
+              오늘 하루 보지 않기
+            </label>
+          </div>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">확인</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // URL 쿼리 파라미터 확인
@@ -825,6 +854,9 @@
           }
         });
       }
+      
+      // 공지사항 모달 표시
+      showNoticeModal();
       
       // 검색 폼 제출 이벤트 처리
       const searchForm = document.getElementById('searchForm');
@@ -942,6 +974,33 @@
       // 알림창 대신 토스트 표시
       const toast = new bootstrap.Toast(document.getElementById('characterDetailToast'));
       toast.show();
+    }
+    
+    // 공지사항 모달 표시 함수
+    function showNoticeModal() {
+      // 쿠키 체크하여 오늘 이미 본 경우 표시하지 않음
+      if (!getCookie('noticeModalShown')) {
+        const noticeModal = new bootstrap.Modal(document.getElementById('noticeModal'));
+        noticeModal.show();
+        
+        // 닫기 버튼 클릭 시 쿠키 설정
+        document.getElementById('noticeModal').addEventListener('hidden.bs.modal', function() {
+          if (document.getElementById('doNotShowAgain').checked) {
+            // 24시간 동안 쿠키 설정
+            const now = new Date();
+            now.setTime(now.getTime() + 24 * 60 * 60 * 1000);
+            document.cookie = `noticeModalShown=true; expires=${now.toUTCString()}; path=/`;
+          }
+        });
+      }
+    }
+    
+    // 쿠키 가져오기 함수
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
     }
   </script>
 </body>
