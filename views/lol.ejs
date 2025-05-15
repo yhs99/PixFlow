@@ -1146,6 +1146,8 @@
   </style>
 </head>
 <body>
+  <% const currentPath = '/lol' %>
+  <%- include('header.ejs', { currentPath }) %>
   <div class="container">
     <button class="theme-switch" id="themeSwitch">🌞</button>
     <div id="gameRoom" style="display: none;">
