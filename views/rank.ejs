@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>별단 순위표</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(15px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    
+    body {
+      font-family: 'SANS-KR', sans-serif;
+      background-color: #0a192f;
+      background-image: 
+          radial-gradient(1px 1px at 10% 10%, white 1px, transparent 0),
+          radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.9) 1px, transparent 0),
+          radial-gradient(1.2px 1.2px at 35% 25%, rgba(255,255,255,0.8) 1px, transparent 0),
+          radial-gradient(1.3px 1.3px at 45% 45%, white 1px, transparent 0),
+          radial-gradient(1.5px 1.5px at 60% 50%, rgba(255,255,255,0.9) 1px, transparent 0),
+          radial-gradient(2px 2px at 75% 70%, rgba(255,255,255,0.8) 1px, transparent 0),
+          radial-gradient(2.5px 2.5px at 85% 15%, white 1px, transparent 0),
+          radial-gradient(1.2px 1.2px at 90% 88%, rgba(255,255,255,0.7) 1px, transparent 0),
+          linear-gradient(to bottom, #0a192f 0%, #20344d 100%);
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      color: #fff;
+      min-height: 100vh;
+      padding-top: 80px; /* 헤더를 위한 여백 추가 */
+    }
+    
+    .container {
+      animation: fadeInUp 0.6s ease-out;
+    }
+    
+    .table-responsive {
+      margin-top: 2rem;
+      animation: scaleIn 0.5s ease-out;
+    }
+    
+    .character-row {
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.2s;
+    }
+    
+    .character-row:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+    
+    .rank-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #142341, #0a192f);
+      color: white;
+      font-weight: bold;
+      font-size: 1.1rem;
+      margin: 0 auto;
+      position: relative;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s ease;
+    }
+    
+    /* 상위 10위까지는 다른 디자인 적용 */
+    .top-10 {
+      background: linear-gradient(135deg, #1f3a63, #0d2347);
+      border: 1px solid rgba(100, 255, 218, 0.3);
+    }
+    
+    /* 1위 디자인 */
+    .rank-1 {
+      background: linear-gradient(135deg, #ffd700, #e6b800);
+      color: #000;
+      border: 2px solid white;
+      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+      border-radius: 8px;
+    }
+    
+    /* 1위 왕관 표시 */
+    .rank-1 .crown {
+      position: absolute;
+      top: -20px;
+      width: 16px;
+      height: 16px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 576 512'%3E%3Cpath fill='%23FFD700' d='M309 106c11.4-7 19-19.7 19-34c0-22.1-17.9-40-40-40s-40 17.9-40 40c0 14.4 7.6 27 19 34L209.7 220.6c-9.1 18.2-32.7 23.4-48.6 10.7L72 160c5-6.7 8-15 8-24c0-22.1-17.9-40-40-40S0 113.9 0 136s17.9 40 40 40c.2 0 .5 0 .7 0L86.4 427.4c5.5 30.4 32 52.6 63 52.6H426.6c30.9 0 57.4-22.1 63-52.6L535.3 176c.2 0 .5 0 .7 0c22.1 0 40-17.9 40-40s-17.9-40-40-40s-40 17.9-40 40c0 9 3 17.3 8 24l-89.1 71.3c-15.9 12.7-39.5 7.5-48.6-10.7L309 106z'/%3E%3C/svg%3E");
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+    
+    /* 2위 디자인 */
+    .rank-2 {
+      background: linear-gradient(135deg, #e0e0e0, #b0b0b0);
+      color: #000;
+      border: 2px solid white;
+      box-shadow: 0 4px 12px rgba(224, 224, 224, 0.5);
+      border-radius: 8px;
+    }
+    
+    /* 3위 디자인 */
+    .rank-3 {
+      background: linear-gradient(135deg, #cd7f32, #a05a2c);
+      color: white;
+      border: 2px solid white;
+      box-shadow: 0 4px 12px rgba(205, 127, 50, 0.5);
+      border-radius: 8px;
+    }
+    
+    /* 순위 배지 호버 효과 */
+    .character-row:hover .rank-badge {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* 모바일 화면에서의 순위 배지 크기 조정 */
+    @media (max-width: 768px) {
+      .rank-badge {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+      }
+    }
+    
+    /* 순위 테이블 열 간격 조정 */
+    .table th:first-child, 
+    .table td:first-child {
+      padding-left: 10px;
+      padding-right: 10px;
+      min-width: 60px;
+    }
+    
+    .class-icon {
+      width: 32px;
+      height: 32px;
+      margin-right: 10px;
+      vertical-align: middle;
+      border-radius: 50%;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    }
+    
+    .search-form {
+      max-width: 500px;
+      margin: 0 auto 2rem auto;
+      background: rgba(10, 25, 47, 0.7);
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+    }
+    
+    .input-group .form-control {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+    
+    .input-group .form-control::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .input-group .form-control:focus {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      box-shadow: 0 0 0 0.25rem rgba(255, 192, 203, 0.25);
+      border-color: rgba(255, 192, 203, 0.5);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(45deg, #4a6baf, #64a1ff);
+      border: none;
+      box-shadow: 0 4px 15px rgba(74, 107, 175, 0.3);
+      transition: all 0.3s;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(74, 107, 175, 0.5);
+      background: linear-gradient(45deg, #5a7bbf, #74b1ff);
+    }
+    
+    .item-level {
+      font-weight: bold;
+      color: #64ffda;
+      text-shadow: 0 0 5px rgba(100, 255, 218, 0.5);
+    }
+    
+    .guild-tag {
+      display: inline-block;
+      padding: 0.2rem 0.75rem;
+      background: linear-gradient(45deg, #4a6baf, #64a1ff);
+      color: white;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      box-shadow: 0 2px 10px rgba(74, 107, 175, 0.3);
+    }
+    
+    .guild-tag:empty {
+      display: none;
+    }
+    
+    .table {
+      background: rgba(10, 25, 47, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .table-dark {
+      background: linear-gradient(180deg, #1a365d, #0a192f);
+    }
+    
+    .table tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    h1 {
+      color: #fff;
+      text-align: center;
+      margin-bottom: 2rem;
+      text-shadow: 0 0 10px rgba(255, 192, 203, 0.5);
+      font-weight: bold;
+    }
+    
+    .alert-info {
+      background: rgba(75, 107, 175, 0.2);
+      border-color: rgba(75, 107, 175, 0.3);
+      color: #ccdeff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(5px);
+    }
+    
+    .alert-danger {
+      background: rgba(220, 53, 69, 0.2);
+      border-color: rgba(220, 53, 69, 0.3);
+      color: #ffcccc;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(5px);
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 5px;
+      text-decoration: none;
+      transition: all 0.3s;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+    }
+
+    .back-button:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+      text-decoration: none;
+      color: white;
+    }
+
+    .back-button svg {
+      margin-right: 5px;
+    }
+    
+    .weapon-info {
+      font-size: 0.9rem;
+      color: #ffd700;
+    }
+    
+    
+    .quality-0-9 { color: #969696; }
+    .quality-10-29 { color: #41ce84; }
+    .quality-30-69 { color: #409dff; }
+    .quality-70-89 { color: #9041ff; }
+    .quality-90-99 { color: #ff9e32; }
+    .quality-100 { color: #ff567b; }
+    
+    .engraving {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 5px;
+      margin: 2px 0;
+      font-size: 0.8rem;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    
+    .engraving-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      max-width: calc(100% - 25px); /* 오른쪽 아이콘 공간 제외 */
+      white-space: nowrap;
+    }
+    
+    .engraving-info {
+      display: flex;
+      align-items: center;
+      margin-left: 5px;
+    }
+    
+    .engraving-img {
+      width: 16px;
+      height: 16px;
+      margin-right: 3px;
+    }
+    
+    .ability-stone-level-0 {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #000000;
+    }
+
+    .ability-stone-level-1 {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .ability-stone-level-2 {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .ability-stone-level-3 {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #ffffff;
+    }
+    
+    .ability-stone-level-4 {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #ffffff;
+    }
+    
+    .engraving-legendary {
+      border-left: 3px solid #ff9e32;
+    }
+    
+    .engraving-relic {
+      border-left: 3px solid #ff567b;
+    }
+    
+    .engraving-stone {
+      border-left: 3px solid #409dff;
+    }
+    
+    .engraving-level-0 {
+      background-color: #FFFFFF;
+      color: #000;
+    }
+    
+    .engraving-level-1 {
+      background-color: #0091cc;
+      color: #fff;
+    }
+    
+    .engraving-level-2 {
+      background-color: #8500b2;
+      color: #fff;
+    }
+    
+    .engraving-level-3 {
+      background-color: #c17502;
+      color: #fff;
+    }
+    
+    .engraving-level-4 {
+      background-color: #b34300;
+      color: #fff;
+    }
+    
+    .awakening-passive {
+      color: #9041ff;
+      font-size: 0.9rem;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+    
+    .engravings-container {
+      max-width: 250px;
+      white-space: normal;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .character-link {
+      color: #fff;
+      text-decoration: none;
+      transition: color 0.2s;
+      display: block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .character-link:hover {
+      color: #64ffda;
+      text-decoration: underline;
+    }
+    
+    .delete-btn {
+      opacity: 0.7;
+      transition: all 0.2s;
+    }
+    
+    .character-row:hover .delete-btn {
+      opacity: 1;
+    }
+    
+    .delete-form {
+      display: inline-block;
+    }
+    
+    .toast {
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 .5rem 2rem rgba(0, 0, 0, 0.5);
+      animation: fadeInUp 0.3s ease-out;
+    }
+    
+    .toast-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .toast-body {
+      font-size: 1rem;
+      font-weight: 500;
+      padding: 0.8rem;
+    }
+    
+    .custom-toast {
+      background: linear-gradient(135deg, #1a365d, #0a192f);
+      color: white;
+    }
+    
+    .custom-toast .toast-header {
+      background: linear-gradient(135deg, #1a365d, #0a192f);
+      color: #64ffda;
+      font-weight: bold;
+    }
+
+    .character-row td {
+      vertical-align: middle;
+    }
+    
+    /* 프로그레스 바 스타일 추가 */
+    .progress {
+      border-radius: 10px;
+      background-color: rgba(10, 25, 47, 0.5);
+      overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    
+    .progress-bar {
+      background: linear-gradient(90deg, #4a6baf, #64a1ff);
+      box-shadow: 0 0 10px rgba(100, 161, 255, 0.5);
+      border-radius: 10px;
+      position: relative;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 5px rgba(100, 161, 255, 0.5);
+      }
+      50% {
+        box-shadow: 0 0 15px rgba(100, 161, 255, 0.8);
+      }
+      100% {
+        box-shadow: 0 0 5px rgba(100, 161, 255, 0.5);
+      }
+    }
+    
+    #progressContainer {
+      animation: fadeInUp 0.5s ease-out;
+      background: rgba(10, 25, 47, 0.3);
+      border-radius: 10px;
+      padding: 15px;
+      border: 1px solid rgba(100, 161, 255, 0.2);
+    }
+    
+    #progressStage {
+      color: #64ffda;
+      font-weight: 500;
+    }
+    
+    #progressPercentage {
+      color: #64a1ff;
+      font-weight: 700;
+    }
+    
+    #progressMessage {
+      font-size: 0.9rem;
+      margin-top: 8px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .progress-bar-striped {
+      background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
+      background-size: 1rem 1rem;
+    }
+    
+    /* 텍스트 잘림 처리를 위한 스타일 */
+    .truncate-text {
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+    
+    /* 직업명 셀 스타일 */
+    .class-name {
+      font-weight: 500;
+    }
+    
+    /* 툴팁 스타일 */
+    .tooltip-container {
+      position: relative;
+      display: inline-block;
+      cursor: pointer;
+    }
+    
+    .help-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .help-icon:hover {
+      transform: scale(1.2);
+    }
+    
+    .tooltip-text {
+      visibility: hidden;
+      width: 260px;
+      background-color: rgba(10, 25, 47, 0.95);
+      color: #64ffda;
+      text-align: center;
+      border-radius: 6px;
+      padding: 10px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 0.85rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(100, 255, 218, 0.3);
+      pointer-events: none;
+    }
+    
+    .tooltip-text::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: rgba(10, 25, 47, 0.95) transparent transparent transparent;
+    }
+  </style>
+</head>
+<body>
+  <%- include('header', { currentPath: '/rank' }) %>
+
+  <div class="container">
+    <h1 class="mb-4">별단 순위표</h1>
+    
+    <!-- 토스트 컨테이너 추가 -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-4">
+      <div id="characterDetailToast" class="toast custom-toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+        <div class="toast-header">
+          <strong class="me-auto">알림</strong>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+          캐릭터 상세정보는 준비중입니다.
+        </div>
+      </div>
+    </div>
+    
+    <div class="alert alert-info mb-4">
+      <strong>안내:</strong> 이 순위표는 별단 길드원만 추가 가능합니다.
+    </div>
+    
+    <!-- 검색 폼 -->
+    <form class="search-form" action="/rank/search" method="post" id="searchForm">
+      <div class="input-group">
+        <input type="text" class="form-control" name="characterName" placeholder="캐릭터 이름" required>
+        <button class="btn btn-primary" type="submit" id="searchButton">검색</button>
+      </div>
+      
+      <!-- 원정대 포함 체크박스 (중앙 배치 및 툴팁 추가) -->
+      <div class="d-flex justify-content-center align-items-center mt-3" style="position: relative;">
+        <div class="form-check d-inline-flex align-items-center">
+          <input class="form-check-input" type="checkbox" name="includeSiblings" id="includeSiblings">
+          <label class="form-check-label ms-2" for="includeSiblings" style="color: #fff; font-size: 0.9rem;">
+            원정대 포함
+          </label>
+          <div class="ms-2 tooltip-container">
+            <span class="help-icon" id="help-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#64ffda" class="bi bi-question-circle" viewBox="0 0 16 16">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
+              </svg>
+            </span>
+            <div class="tooltip-text" id="tooltip-text">
+              체크시 원정대의 모든 별단 길드 캐릭터가 추가됩니다.
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 진행 상황 표시 영역 추가 -->
+      <div id="progressContainer" class="mt-3" style="display: none;">
+        <div class="d-flex justify-content-between mb-1">
+          <span id="progressStage" class="small text-light">처리 중...</span>
+          <span id="progressPercentage" class="small text-light">0%</span>
+        </div>
+        <div class="progress" style="height: 8px;">
+          <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+               role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <p id="progressMessage" class="small text-light mt-1">캐릭터 정보를 검색하는 중입니다...</p>
+      </div>
+    </form>
+    
+    <% if (error) { %>
+      <div class="alert alert-danger" role="alert">
+        <%= error %>
+      </div>
+    <% } %>
+    
+    <!-- 순위표 -->
+    <div class="table-responsive">
+      <table class="table table-hover text-white">
+        <thead class="table-dark">
+          <tr>
+            <th scope="col" width="7%">순위</th>
+            <th scope="col" width="17%">직업</th>
+            <th scope="col" width="14%">캐릭터</th>
+            <th scope="col" width="13%">아이템 레벨</th>
+            <th scope="col" width="15%">무기</th>
+            <th scope="col" width="19%">아크패시브</th>
+            <th scope="col" width="15%">각인</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (characters && characters.length > 0) { %>
+            <% characters.forEach((character, index) => { %>
+              <tr class="character-row">
+                <td>
+                  <div class="rank-badge <%= index < 3 ? `rank-${index+1}` : (index < 10 ? 'top-10' : '') %>">
+                    <% if (index === 0) { %><div class="crown"></div><% } %>
+                    <%= index + 1 %>
+                  </div>
+                </td>
+                <td><span class="class-name truncate-text" title="<%= character.className %>"><%= character.className %></span></td>
+                <td><a href="javascript:void(0)" onclick="showDetailPageAlert()" class="character-link" title="<%= character.characterName %>"><%= character.characterName %></a></td>
+                <td class="item-level"><%= character.itemLevel.toFixed(2) %></td>
+                <td>
+                  <% if (character.weapon && character.weapon.level > 0) { %>
+                    <span class="weapon-info">+<%= character.weapon.level %></span><br>
+                    <small class="weapon-quality 
+                    <% if (character.weapon.quality >= 100) { %>quality-100
+                    <% } else if (character.weapon.quality >= 90) { %>quality-90-99
+                    <% } else if (character.weapon.quality >= 70) { %>quality-70-89
+                    <% } else if (character.weapon.quality >= 30) { %>quality-30-69
+                    <% } else if (character.weapon.quality >= 10) { %>quality-10-29
+                    <% } else { %>quality-0-9<% } %>"
+                    title="무기 품질: <%= character.weapon.quality %>%">(<%= character.weapon.quality %>)</small>
+                    
+                  <% } else { %>
+                    -
+                  <% } %>
+                </td>
+                <td>
+                  <% if (character.awakening) { %>
+                    <span class="awakening-passive" title="<%= character.awakening %>"><%= character.awakening %></span>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </td>
+                <td>
+                  <div class="engravings-container">
+                    <% if (character.engravings && character.engravings.length > 0) { %>
+                      <% character.engravings.forEach(eng => { %>
+                        <div class="engraving engraving-relic engraving-level-<%= eng.level %>" title="<%= eng.name %>">
+                          <span class="engraving-name"><%= eng.name.replace(/Lv\. \d+/, '') %> <%= eng.level %></span>
+                          <span class="engraving-info">
+                            <% if (eng.abilityStoneLevel) { %>
+                              <img src="/engrave.png" alt="각인" class="engraving-img">
+                              <span class="ability-stone-level-<%= eng.level %>">Lv. <%= eng.abilityStoneLevel %></span>
+                            <% } %>
+                          </span>
+                        </div>
+                      <% }); %>
+                    <% } %>
+                    
+                    <% if (character.abilityStoneEngravings && character.abilityStoneEngravings.length > 0) { %>
+                      <% character.abilityStoneEngravings.forEach(eng => { %>
+                        <div class="engraving engraving-stone engraving-level-<%= eng.level %>" title="어빌스톤: <%= eng.name %>">
+                          <span class="engraving-name"><%= eng.name %> +<%= eng.level %></span>
+                          <span class="engraving-info">
+                            <img src="/images/engrave.png" alt="각인" class="engraving-img">
+                          </span>
+                        </div>
+                      <% }); %>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+            <% }); %>
+          <% } else { %>
+            <tr>
+              <td colspan="8" class="text-center">
+                <p class="my-3">데이터가 없습니다. 캐릭터를 검색해주세요.</p>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="mt-4 text-center">
+      <a href="/" class="back-button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house" viewBox="0 0 16 16">
+          <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5ZM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5 5 5Z"/>
+        </svg>
+        홈으로 돌아가기
+      </a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // URL 쿼리 파라미터 확인
+    document.addEventListener('DOMContentLoaded', function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const deletedParam = urlParams.get('deleted');
+      const errorParam = urlParams.get('error');
+      
+      if (deletedParam) {
+        showAlert('success', `캐릭터 '${deletedParam}'이(가) 성공적으로 삭제되었습니다.`);
+      } else if (errorParam) {
+        showAlert('danger', errorParam);
+      }
+      
+      // 툴팁 기능 설정
+      const helpIcon = document.getElementById('help-icon');
+      const tooltip = document.getElementById('tooltip-text');
+      
+      if (helpIcon && tooltip) {
+        // 마우스 오버 시 툴팁 표시
+        helpIcon.addEventListener('mouseenter', function() {
+          tooltip.style.visibility = 'visible';
+          tooltip.style.opacity = '1';
+        });
+        
+        // 마우스가 벗어나면 툴팁 숨김
+        helpIcon.addEventListener('mouseleave', function() {
+          tooltip.style.visibility = 'hidden';
+          tooltip.style.opacity = '0';
+        });
+        
+        // 모바일 터치 지원
+        helpIcon.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          if (tooltip.style.visibility === 'visible') {
+            tooltip.style.visibility = 'hidden';
+            tooltip.style.opacity = '0';
+          } else {
+            tooltip.style.visibility = 'visible';
+            tooltip.style.opacity = '1';
+          }
+        });
+      }
+      
+      // 검색 폼 제출 이벤트 처리
+      const searchForm = document.getElementById('searchForm');
+      const searchButton = document.getElementById('searchButton');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressBar = document.getElementById('progressBar');
+      const progressStage = document.getElementById('progressStage');
+      const progressMessage = document.getElementById('progressMessage');
+      const progressPercentage = document.getElementById('progressPercentage');
+      
+      if (searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          // 폼 데이터 가져오기
+          const formData = new FormData(searchForm);
+          const characterName = formData.get('characterName');
+          
+          if (!characterName) {
+            showAlert('danger', '캐릭터 이름을 입력해주세요.');
+            return;
+          }
+          
+          // 버튼 비활성화 및 진행 상황 표시 영역 보이기
+          searchButton.disabled = true;
+          searchButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 검색 중...';
+          progressContainer.style.display = 'block';
+          progressBar.style.width = '0%';
+          progressBar.setAttribute('aria-valuenow', 0);
+          progressStage.textContent = '초기화 중...';
+          progressMessage.textContent = '캐릭터 정보를 검색하는 중입니다...';
+          progressPercentage.textContent = '0%';
+          
+          // SSE 연결 설정
+          const eventSource = new EventSource(`/rank/search?characterName=${encodeURIComponent(characterName)}&includeSiblings=${formData.get('includeSiblings') ? 'on' : 'off'}`);
+          
+          // 진행 상황 이벤트 처리
+          eventSource.onmessage = function(event) {
+            try {
+              const data = JSON.parse(event.data);
+              
+              // 진행 상황 업데이트
+              progressBar.style.width = `${data.percentage}%`;
+              progressBar.setAttribute('aria-valuenow', data.percentage);
+              progressStage.textContent = data.stage;
+              progressMessage.textContent = data.message;
+              progressPercentage.textContent = `${data.percentage}%`;
+              
+              // 완료 또는 오류 시 처리
+              if (data.stage === 'complete') {
+                // 완료 후 페이지 리로드
+                eventSource.close();
+                showAlert('success', '캐릭터 정보가 성공적으로 업데이트되었습니다.');
+                
+                // 0.5초 후 페이지 새로고침
+                setTimeout(() => {
+                  window.location.href = '/rank';
+                }, 500);
+              } else if (data.stage === 'error') {
+                // 오류 발생 시
+                eventSource.close();
+                showAlert('danger', data.message);
+                resetFormState();
+              }
+            } catch (error) {
+              console.error('이벤트 데이터 파싱 오류:', error);
+              eventSource.close();
+              showAlert('danger', '데이터 처리 중 오류가 발생했습니다.');
+              resetFormState();
+            }
+          };
+          
+          // 오류 이벤트 처리
+          eventSource.onerror = function(error) {
+            console.error('SSE 연결 오류:', error);
+            eventSource.close();
+            showAlert('danger', '서버 연결 중 오류가 발생했습니다.');
+            resetFormState();
+          };
+        });
+      }
+      
+      // 폼 상태 초기화 함수
+      function resetFormState() {
+        if (searchButton) {
+          searchButton.disabled = false;
+          searchButton.innerHTML = '검색';
+        }
+        if (progressContainer) {
+          progressContainer.style.display = 'none';
+        }
+      }
+      
+      function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        const container = document.querySelector('.container');
+        container.insertBefore(alertDiv, document.querySelector('.search-form'));
+        
+        // 5초 후 자동으로 닫기
+        setTimeout(() => {
+          alertDiv.classList.remove('show');
+          setTimeout(() => alertDiv.remove(), 300);
+        }, 5000);
+      }
+    });
+    
+    function showDetailPageAlert() {
+      // 알림창 대신 토스트 표시
+      const toast = new bootstrap.Toast(document.getElementById('characterDetailToast'));
+      toast.show();
+    }
+  </script>
+</body>
+</html>

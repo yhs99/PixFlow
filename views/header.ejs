@@ -1,0 +1,125 @@
+<% 
+// 현재 페이지 경로를 기반으로 활성 탭 결정
+const currentPath = locals.currentPath || ''; 
+const isHome = currentPath === '' || currentPath === '/';
+const isRank = currentPath.includes('/rank');
+const isLol = currentPath.includes('/lol');
+%>
+
+<!-- 헤더 스타일 -->
+<style>
+  /* 헤더 스타일 */
+  .site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(10, 25, 47, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 1001;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* body 패딩 설정 */
+  body {
+    padding-top: 60px; /* 헤더 높이만큼 body 상단 여백 추가 */
+  }
+
+  .header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem;
+    height: 60px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .main-logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .main-logo img {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .main-logo h1 {
+    font-size: 1.3rem;
+    color: white;
+    text-shadow: 0 0 10px rgba(255, 192, 203, 0.5);
+    margin: 0;
+  }
+  
+  .nav-tabs {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .nav-tab {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+  }
+  
+  .nav-tab:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .nav-tab.active {
+    color: white;
+    background: rgba(100, 255, 218, 0.1);
+    border-bottom: 2px solid #64ffda;
+  }
+  
+  /* 롤 전적 링크 특별 스타일 */
+  .nav-tab[href="/lol"] {
+    background: rgba(235, 83, 83, 0.1);
+    position: relative;
+  }
+  
+  .nav-tab[href="/lol"]:hover {
+    background: rgba(235, 83, 83, 0.2);
+  }
+  
+  .nav-tab[href="/lol"].active {
+    background: rgba(235, 83, 83, 0.2);
+    border-bottom: 2px solid #eb5353;
+  }
+  
+  @media (max-width: 768px) {
+    .header-container {
+      padding: 0 1rem;
+    }
+    
+    .main-logo h1 {
+      font-size: 1rem;
+    }
+    
+    .nav-tab {
+      padding: 0.5rem;
+    }
+  }
+</style>
+
+<!-- 헤더 HTML 구조 -->
+<header class="site-header">
+  <div class="header-container">
+    <div class="main-logo">
+      <img src="/uploads/star.ico" alt="로고">
+      <h1>별단</h1>
+    </div>
+    <nav class="nav-tabs">
+      <a href="/" class="nav-tab <%= isHome ? 'active' : '' %>">갤러리</a>
+      <a href="/rank" class="nav-tab <%= isRank ? 'active' : '' %>">순위표</a>
+      <a href="/lol" class="nav-tab <%= isLol ? 'active' : '' %>">칼바람</a>
+    </nav>
+  </div>
+</header>

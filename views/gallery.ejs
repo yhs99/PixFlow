@@ -45,7 +45,7 @@
 
         .header {
             position: fixed;
-            top: 0;
+            top: 60px; /* 메인 헤더 아래에 위치하도록 수정 */
             left: 0;
             right: 0;
             display: flex;
@@ -56,6 +56,73 @@
             backdrop-filter: blur(10px);
             z-index: 999;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+            height: 60px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .main-logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .main-logo img {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .main-logo h1 {
+            font-size: 1.3rem;
+            color: white;
+            text-shadow: 0 0 10px rgba(255, 192, 203, 0.5);
+            margin: 0;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .nav-tab {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        
+        .nav-tab:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .nav-tab.active {
+            color: white;
+            background: rgba(100, 255, 218, 0.1);
+            border-bottom: 2px solid #64ffda;
+        }
+        
+        @media (max-width: 768px) {
+            .header-container {
+                padding: 0 1rem;
+            }
+            
+            .main-logo h1 {
+                font-size: 1rem;
+            }
+            
+            .nav-tab {
+                padding: 0.5rem;
+            }
         }
 
         .logo {
@@ -72,7 +139,7 @@
 
         @media (max-width: 1024px) {
             .logo {
-                margin-left: 40px;
+                display: none; /* 로고를 숨김 처리 */
             }
         }
 
@@ -132,6 +199,7 @@
             display: flex;
             overflow-x: hidden;
             position: relative;
+            padding-top: 60px; /* 메인 헤더를 위한 패딩 추가 */
         }
 
         .sidebar {
@@ -389,14 +457,14 @@
             height: 100%;
             background: rgba(10, 25, 47, 0.95);
             backdrop-filter: blur(10px);
-            z-index: 1000;
+            z-index: 1100; /* z-index를 1100으로 높임 (헤더의 1001보다 높게) */
             display: flex;
             justify-content: center;
             align-items: center;
             opacity: 0;
             visibility: hidden;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 20px 0;
+            padding: 80px 0 20px; /* 상단 패딩을 80px로 증가시켜 헤더 아래에 콘텐츠가 위치하도록 함 */
             overflow-y: hidden;
             overflow-x: hidden;
         }
@@ -658,7 +726,7 @@
 
         .slider-close {
             position: absolute;
-            top: 20px;
+            top: 80px; /* 상단에서 80px 떨어진 위치로 조정 */
             right: 20px;
             background: rgba(255, 255, 255, 0.1);
             border: none;
@@ -672,6 +740,7 @@
             align-items: center;
             justify-content: center;
             transition: all 0.3s ease;
+            z-index: 1102; /* 슬라이더 내에서 최상위로 표시 */
         }
 
         .slider-close:hover {
@@ -881,7 +950,7 @@
 
         .slider-uploader-info {
             position: absolute;
-            top: 20px;
+            top: 80px; /* 상단에서 80px 떨어진 위치로 조정 */
             left: 20px;
             padding: 8px 12px;
             background: rgba(0, 0, 0, 0.7);
@@ -891,7 +960,7 @@
             gap: 8px;
             border-radius: 20px;
             backdrop-filter: blur(5px);
-            z-index: 1001;
+            z-index: 1101;
         }
 
         .slider-uploader-avatar {
@@ -1354,7 +1423,7 @@
             align-items: center;
             justify-content: center;
             transition: all 0.3s ease;
-            z-index: 1001;
+            z-index: 1101; /* z-index 값 증가 */
         }
 
         .slider-nav-button:hover {
@@ -1363,11 +1432,11 @@
         }
 
         .slider-nav-prev {
-            left: 20px;
+            left: 40px; /* 위치 조정 */
         }
 
         .slider-nav-next {
-            right: 20px;
+            right: 40px; /* 위치 조정 */
         }
 
         .slider-nav-button svg {
@@ -1651,11 +1720,9 @@
     </style>
 </head>
 <body>
+    <%- include('header', { currentPath: '/' }) %>
+
     <div class="header">
-        <div class="logo">
-            <img src="/uploads/star.ico" alt="로고">
-            <h1>별단 추억갤러리</h1>
-        </div>
         <div class="auth-buttons">
             <% if (user) { %>
                 <div class="user-info" onclick="toggleUserMenu()">
@@ -2346,7 +2413,7 @@
                         div.className = `comment ${isReply ? 'reply' : ''}`;
                         div.innerHTML = `
                             <div class="comment-header">
-                                <img src="${comment.avatar}" alt="프로필" class="comment-avatar">
+                                <img src="${comment.avatar || '/discord.png'}" alt="프로필" class="comment-avatar">
                                 <span class="comment-author">${comment.displayName}</span>
                             </div>
                             <div class="comment-content">${comment.content}</div>

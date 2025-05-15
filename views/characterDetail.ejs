@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= character ? character.profile.name : '캐릭터 정보' %> - 상세 정보</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    body {
+      font-family: 'SANS-KR', sans-serif;
+      background-color: #0a192f;
+      background-image: 
+          radial-gradient(1px 1px at 10% 10%, white 1px, transparent 0),
+          radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.9) 1px, transparent 0),
+          radial-gradient(1.2px 1.2px at 35% 25%, rgba(255,255,255,0.8) 1px, transparent 0),
+          radial-gradient(1.3px 1.3px at 45% 45%, white 1px, transparent 0),
+          radial-gradient(1.5px 1.5px at 60% 50%, rgba(255,255,255,0.9) 1px, transparent 0),
+          radial-gradient(2px 2px at 75% 70%, rgba(255,255,255,0.8) 1px, transparent 0),
+          radial-gradient(2.5px 2.5px at 85% 15%, white 1px, transparent 0),
+          radial-gradient(1.2px 1.2px at 90% 88%, rgba(255,255,255,0.7) 1px, transparent 0),
+          linear-gradient(to bottom, #0a192f 0%, #20344d 100%);
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      color: #fff;
+      min-height: 100vh;
+      padding-top: 2rem;
+    }
+    
+    .container {
+      animation: fadeInUp 0.6s ease-out;
+    }
+    
+    .card {
+      margin-bottom: 2rem;
+      border: none;
+      box-shadow: 0 .5rem 2rem rgba(0, 0, 0, 0.3);
+      background: rgba(10, 25, 47, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      animation: scaleIn 0.5s ease-out;
+      color: #fff;
+    }
+    
+    .card-header {
+      background: linear-gradient(180deg, #1a365d, #0a192f);
+      color: white;
+      font-weight: bold;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1rem 1.5rem;
+    }
+    
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 5px;
+      text-decoration: none;
+      transition: all 0.3s;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+    }
+    
+    .back-button:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+      text-decoration: none;
+      color: white;
+    }
+    
+    .back-button svg {
+      margin-right: 5px;
+    }
+    
+    .character-profile {
+      background: rgba(10, 25, 47, 0.8);
+      border-radius: 10px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 .5rem 2rem rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-wrap: wrap;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .character-bg-image {
+      position: absolute;
+      right: 0;
+      top: 0;
+      height: 100%;
+      opacity: 0.6;
+      z-index: 0;
+      object-fit: cover;
+      object-position: right center;
+      max-width: 60%;
+    }
+    
+    .character-avatar {
+      width: 120px;
+      height: 120px;
+      border-radius: 10px;
+      object-fit: cover;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      z-index: 1;
+    }
+    
+    .character-info {
+      flex: 1;
+      padding-left: 2rem;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .character-name {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: #fff;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+    
+    .character-class {
+      font-size: 1.2rem;
+      color: #64ffda;
+      margin-bottom: 1rem;
+    }
+    
+    .character-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+    
+    .stat-item {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 90px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s;
+    }
+    
+    .stat-item:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .stat-label {
+      font-size: 0.8rem;
+      opacity: 0.8;
+      margin-bottom: 0.25rem;
+    }
+    
+    .stat-value {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #64ffda;
+    }
+    
+    .item-level {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #64ffda;
+      text-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
+      margin-bottom: 0.5rem;
+    }
+    
+    .guild-name {
+      font-size: 1rem;
+      background: linear-gradient(45deg, #4a6baf, #64a1ff);
+      display: inline-block;
+      padding: 0.25rem 1rem;
+      border-radius: 4px;
+      margin-top: 0.5rem;
+    }
+    
+    .server-name {
+      opacity: 0.7;
+      font-size: 0.9rem;
+    }
+    
+    .alert-danger {
+      background: rgba(220, 53, 69, 0.2);
+      border-color: rgba(220, 53, 69, 0.3);
+      color: #ffcccc;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(5px);
+    }
+    
+    .equipment-section {
+      margin-top: 2rem;
+    }
+    
+    .equipment-section h3 {
+      font-size: 1.2rem;
+      color: #64ffda;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .equipment-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .equipment-container {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+    
+    .equipment-left-section {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    .equipment-right-section {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    .equipment-item {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+    }
+    
+    .equipment-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .equipment-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      margin-right: 1rem;
+      background-color: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .equipment-details {
+      flex: 1;
+    }
+    
+    .equipment-name {
+      font-weight: bold;
+      margin-bottom: 0.25rem;
+    }
+    
+    .equipment-type {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-bottom: 0.5rem;
+    }
+    
+    .equipment-quality {
+      height: 6px;
+      border-radius: 3px;
+      margin-top: 0.5rem;
+      position: relative;
+    }
+    
+    .quality-text {
+      position: absolute;
+      right: 0;
+      top: -18px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    
+    .quality-0 { background-color: #969696; }
+    .quality-10 { background-color: #41ce84; }
+    .quality-30 { background-color: #409dff; }
+    .quality-70 { background-color: #9041ff; }
+    .quality-90 { background-color: #ff9e32; }
+    .quality-100 { background-color: #ff567b; }
+    
+    .accessory-options {
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+    
+    .accessory-option {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+    
+    .accessory-option-value {
+      color: #64ffda;
+    }
+    
+    .bonus-effect {
+      font-size: 0.8rem;
+      color: #ff9e32;
+      margin-top: 0.5rem;
+    }
+    
+    .elixir-level {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      background: linear-gradient(45deg, #4a6baf, #64a1ff);
+      margin-left: 0.5rem;
+    }
+
+    .transcendence-level {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      background: linear-gradient(45deg, #c77d0e, #ffa930);
+      margin-left: 0.5rem;
+    }
+    
+    .section-title {
+      color: #fff;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 0.5rem;
+    }
+    
+    .gems-section {
+      margin-top: 2rem;
+    }
+    
+    .gems-container {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+    
+    .gems-damage-section {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    .gems-cooldown-section {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    .gems-section h3 {
+      font-size: 1.2rem;
+      color: #64ffda;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .gems-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .gem-item {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .gem-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .gem-header {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+    
+    .gem-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      margin-right: 0.75rem;
+      background-color: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .gem-info {
+      flex: 1;
+    }
+    
+    .gem-level {
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #ffd700;
+      margin-top: 0.25rem;
+    }
+    
+    .gem-name {
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .gem-effect {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .gem-skill-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+    }
+    
+    .gem-effect-text {
+      font-size: 0.85rem;
+      flex: 1;
+    }
+    
+    .gem-type-damage, .gem-damage {
+      border-left: 3px solid #ff567b;
+    }
+    
+    .gem-type-cooldown, .gem-cooldown {
+      border-left: 3px solid #409dff;
+    }
+    
+    .info-message {
+      padding: 1rem;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+      font-style: italic;
+    }
+    
+    .engravings-section {
+      margin-top: 2rem;
+    }
+    
+    .engravings-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+    
+    .engravings-active {
+      flex: 2;
+      min-width: 300px;
+    }
+    
+    .engravings-details {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    .engraving-item {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s;
+    }
+    
+    .engraving-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .engraving-icon-wrapper {
+      margin-right: 1rem;
+    }
+    
+    .engraving-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background-color: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .engraving-icon-placeholder {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background-color: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .engraving-info {
+      flex: 1;
+    }
+    
+    .engraving-name {
+      font-weight: bold;
+      margin-bottom: 0.25rem;
+    }
+    
+    .engraving-level {
+      display: flex;
+      align-items: center;
+    }
+    
+    .level-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #64a1ff;
+      margin-right: 5px;
+    }
+    
+    .level-text {
+      margin-left: 5px;
+      font-size: 0.9rem;
+      color: #64ffda;
+    }
+    
+    .engraving-source {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s;
+      margin-bottom: 0.5rem;
+    }
+    
+    .engraving-source:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+    
+    .source-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+    }
+    
+    .source-type {
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      margin-right: 0.5rem;
+    }
+    
+    .source-name {
+      margin-right: 0.5rem;
+    }
+    
+    .source-value {
+      font-weight: bold;
+      color: #64ffda;
+      margin-left: auto;
+    }
+    
+    /* 각인 소스 타입별 스타일 */
+    .source-각인서 {
+      border-left: 3px solid #ff9e32;
+    }
+    
+    .source-목걸이, .source-귀걸이, .source-반지 {
+      border-left: 3px solid #409dff;
+    }
+    
+    .source-어빌리티-스톤 {
+      border-left: 3px solid #9041ff;
+    }
+    
+    .source-아크패시브 {
+      border-left: 3px solid #64ffda;
+    }
+    
+    /* 아크패시브 스타일 추가 */
+    .arkpassive-section {
+      margin-top: 2rem;
+      margin-bottom: 3rem;
+    }
+    
+    .arkpassive-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-top: 1rem;
+    }
+    
+    .arkpassive-item {
+      flex: 1;
+      min-width: 300px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s;
+    }
+    
+    .arkpassive-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .arkpassive-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .arkpassive-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      margin-right: 1rem;
+      background-color: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .arkpassive-title {
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: #9041ff;
+    }
+    
+    .arkpassive-level {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: linear-gradient(45deg, #7933d1, #9041ff);
+      font-size: 0.8rem;
+      margin-left: 0.5rem;
+    }
+    
+    .arkpassive-description {
+      color: #ccc;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    
+    .arkpassive-tier {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .arkpassive-tier-title {
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: #64ffda;
+    }
+    
+    .arkpassive-tier-effect {
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    
+    .arkpassive-progress {
+      display: flex;
+      align-items: center;
+      margin-top: 1rem;
+    }
+    
+    .arkpassive-progress-bar {
+      flex: 1;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      margin-right: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .arkpassive-progress-bar::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #7933d1, #9041ff);
+      border-radius: 4px;
+    }
+    
+    .arkpassive-progress-bar[data-progress="1"]::before { width: 25%; }
+    .arkpassive-progress-bar[data-progress="2"]::before { width: 50%; }
+    .arkpassive-progress-bar[data-progress="3"]::before { width: 75%; }
+    .arkpassive-progress-bar[data-progress="4"]::before { width: 100%; }
+    
+    .arkpassive-progress-text {
+      font-weight: bold;
+      color: #9041ff;
+      width: 80px;
+      text-align: right;
+    }
+    
+    .stat-icon {
+      height: 24px;
+      width: 24px;
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .bracelet-section, .stone-section {
+      margin-top: 8px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      padding-top: 8px;
+    }
+    
+    .bracelet-header, .stone-header {
+      font-size: 0.85rem;
+      margin-bottom: 5px;
+      color: #64ffda;
+      font-weight: bold;
+    }
+    
+    .accessory-options {
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+    
+    .accessory-option {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+      padding: 2px 0;
+    }
+    
+    .accessory-option-value {
+      font-weight: bold;
+      color: #64ffda;
+    }
+    
+    .accessory-option-value.negative {
+      color: #ff6464;
+    }
+    
+    .positive-engraving {
+      color: #64b5ff;
+    }
+    
+    .negative-engraving {
+      color: #ff6464;
+    }
+    
+    .equipment-container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .equipment-left-section, .equipment-right-section {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    /* 보석 섹션 스타일 개선 */
+    .gems-container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .gems-damage-section, .gems-cooldown-section {
+      flex: 1;
+      min-width: 300px;
+    }
+    
+    .gem-damage {
+      border-left: 3px solid #ff6464;
+    }
+    
+    .gem-cooldown {
+      border-left: 3px solid #64b5ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/rank" class="back-button mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+      </svg>
+      순위표로 돌아가기
+    </a>
+    <% if (error) { %>
+      <div class="alert alert-danger" role="alert">
+        <%= error %>
+      </div>
+    <% } else if (character) { %>
+      <!-- 캐릭터 기본 정보 -->
+      <div class="character-profile">
+        <img src="<%= character.profile.image %>" alt="<%= character.profile.class %>" class="character-bg-image">
+        <img src="<%= character.profile.image %>" alt="<%= character.profile.class %>" class="character-avatar">
+        
+        <div class="character-info">
+          <h1 class="character-name">
+            <%= character.profile.name %>
+            <% if (character.profile.guild) { %>
+              <span class="guild-name"><%= character.profile.guild %></span>
+            <% } %>
+          </h1>
+          
+          <div class="character-class">
+            <%= character.profile.class %>
+            <span class="server-name">@<%= character.profile.server %></span>
+          </div>
+          
+          <div class="item-level">아이템 레벨 <%= character.profile.itemLevel %></div>
+          
+          <div class="character-stats">
+            <div class="stat-item">
+              <div class="stat-label">전투</div>
+              <div class="stat-value"><%= character.profile.level %></div>
+            </div>
+            
+            <% if (character.collectibles && character.collectibles.Points) { %>
+              <div class="stat-item">
+                <div class="stat-label">수집</div>
+                <div class="stat-value"><%= character.collectibles.Points %></div>
+              </div>
+            <% } %>
+            
+            <% if (character.colosseums && character.colosseums.Rank) { %>
+              <div class="stat-item">
+                <div class="stat-label">PVP</div>
+                <div class="stat-value"><%= character.colosseums.Rank %></div>
+              </div>
+            <% } %>
+            
+            <div class="stat-item">
+              <div class="stat-label">길드</div>
+              <div class="stat-value"><%= character.profile.guild || '-' %></div>
+            </div>
+            <% if (character.equipment && Array.isArray(character.equipment)) { %>
+              <% 
+                const compass = character.equipment.find(item => item && item.type && item.type.includes('나침반'));
+                const amulet = character.equipment.find(item => item && item.type && item.type.includes('부적'));
+                const emblem = character.equipment.find(item => item && item.type && item.type.includes('문장'));
+              %>
+              
+              <% if (compass) { %>
+              <div class="stat-item stat-tooltip" data-bs-toggle="tooltip" data-bs-html="true" title="<%= compass.name %>">
+                <div class="stat-label">나침반</div>
+                <div class="stat-icon">
+                  <img src="<%= compass.icon %>" alt="<%= compass.name %>" style="width: 24px; height: 24px;">
+                </div>
+              </div>
+              <% } %>
+              
+              <% if (amulet) { %>
+              <div class="stat-item stat-tooltip" data-bs-toggle="tooltip" data-bs-html="true" title="<%= amulet.name %>">
+                <div class="stat-label">부적</div>
+                <div class="stat-icon">
+                  <img src="<%= amulet.icon %>" alt="<%= amulet.name %>" style="width: 24px; height: 24px;">
+                </div>
+              </div>
+              <% } %>
+              
+              <% if (emblem) { %>
+              <div class="stat-item stat-tooltip" data-bs-toggle="tooltip" data-bs-html="true" title="<%= emblem.name %>">
+                <div class="stat-label">문장</div>
+                <div class="stat-icon">
+                  <img src="<%= emblem.icon %>" alt="<%= emblem.name %>" style="width: 24px; height: 24px;">
+                </div>
+              </div>
+              <% } %>
+            <% } %>
+            
+            <div class="stat-item">
+              <div class="stat-label">최근 갱신</div>
+              <div class="stat-value" style="font-size: 0.8rem;">
+                <%= new Date(character.profile.lastUpdated).toLocaleString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 장비 정보 -->
+      <div class="equipment-section">
+        <h2 class="section-title">장비 정보</h2>
+        
+        <div class="equipment-container">
+          <!-- 장비 섹션 -->
+          <div class="equipment-left-section">
+            <h3>장비</h3>
+            <div class="equipment-grid">
+              <% if (character.equipment && Array.isArray(character.equipment)) { %>
+                <% character.equipment
+                    .filter(item => !item.type || (!item.type.includes('나침반') && !item.type.includes('부적') && !item.type.includes('문장')))
+                    .forEach(item => { %>
+                  <div class="equipment-item">
+                    <img src="<%= item.icon %>" alt="<%= item.type %>" class="equipment-icon">
+                    <div class="equipment-details">
+                      <div class="equipment-name">
+                        <%- item.name %>
+                        <% if (item.elixir) { %>
+                          <span class="elixir-level">Lv.<%= item.elixir.level %></span>
+                        <% } %>
+                        <% if (item.transcendLevel) { %>
+                          <span class="transcendence-level"><%= item.transcendLevel %>단계</span>
+                        <% } %>
+                      </div>
+                      <div class="equipment-type"><%= item.type %></div>
+                      <div class="equipment-quality quality-<%= item.quality %>">
+                        <span class="quality-text"><%= item.quality %>%</span>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              <% } %>
+            </div>
+          </div>
+          
+          <!-- 악세사리 섹션 -->
+          <div class="equipment-right-section">
+            <h3>악세사리</h3>
+            <div class="equipment-grid">
+              <% if (character.accessories && Array.isArray(character.accessories)) { %>
+                <% character.accessories.forEach(item => { %>
+                  <div class="equipment-item">
+                    <img src="<%= item.icon %>" alt="<%= item.type %>" class="equipment-icon">
+                    
+                    <div class="equipment-details">
+                      <div class="equipment-name">
+                        <%= item.name %>
+                      </div>
+                      
+                      <div class="equipment-type"><%= item.type %></div>
+                      
+                      <% if (item.quality) { %>
+                        <div class="equipment-quality quality-<%= 
+                          item.quality >= 100 ? '100' : 
+                          item.quality >= 90 ? '90' : 
+                          item.quality >= 70 ? '70' : 
+                          item.quality >= 30 ? '30' : 
+                          item.quality >= 10 ? '10' : '0' 
+                        %>">
+                          <span class="quality-text"><%= item.quality %>%</span>
+                        </div>
+                      <% } %>
+
+                      <% if (item.effects && Array.isArray(item.effects)) { %>
+                        <div class="accessory-options">
+                          <% item.effects.forEach(effect => { %>
+                            <div class="accessory-option">
+                              <span><%= effect.name || effect %></span>
+                              <% if (effect.value) { %>
+                                <span class="accessory-option-value"><%= effect.value %></span>
+                              <% } %>
+                            </div>
+                          <% }); %>
+                        </div>
+                      <% } %>
+                      
+                      <!-- 팔찌 효과 표시 -->
+                      <% if (item.type && item.type.includes('팔찌') && item.braceletEffects && Array.isArray(item.braceletEffects)) { %>
+                        <div class="accessory-options">
+                          <% 
+                            const baseEffects = item.braceletEffects.filter(effect => effect.type === '기본효과');
+                            const additionalEffects = item.braceletEffects.filter(effect => effect.type === '추가효과');
+                          %>
+                          
+                          <% if (baseEffects.length > 0) { %>
+                            <div class="bracelet-section">
+                              <div class="bracelet-header">기본 효과</div>
+                              <% baseEffects.forEach(effect => { %>
+                                <div class="accessory-option">
+                                  <span><%= effect.name %></span>
+                                  <% if (effect.value) { %>
+                                    <span class="accessory-option-value"><%= effect.value %></span>
+                                  <% } %>
+                                </div>
+                              <% }); %>
+                            </div>
+                          <% } %>
+                          
+                          <% if (additionalEffects.length > 0) { %>
+                            <div class="bracelet-section">
+                              <div class="bracelet-header">추가 효과</div>
+                              <% additionalEffects.forEach(effect => { %>
+                                <div class="accessory-option">
+                                  <span><%= effect.name %></span>
+                                  <% if (effect.value) { %>
+                                    <span class="accessory-option-value"><%= effect.value %></span>
+                                  <% } %>
+                                </div>
+                              <% }); %>
+                            </div>
+                          <% } %>
+                        </div>
+                      <% } %>
+                      
+                      <!-- 어빌리티 스톤 표시 -->
+                      <% if (item.type && item.type.includes('어빌리티 스톤') && item.abilityStone) { %>
+                        <div class="accessory-options">
+                          <!-- 6. 어빌리티 스톤 표시 개선 -->
+                          <% if (item.abilityStone.effects && item.abilityStone.effects.length > 0) { %>
+                            <div class="stone-section">
+                              <div class="stone-header">기본 효과</div>
+                              <% item.abilityStone.effects.forEach(effect => { %>
+                                <div class="accessory-option">
+                                  <span><%= effect.name %></span>
+                                  <% if (effect.value) { %>
+                                    <span class="accessory-option-value"><%= effect.value %></span>
+                                  <% } %>
+                                </div>
+                              <% }); %>
+                            </div>
+                          <% } %>
+                          
+                          <% if (item.abilityStone.engravings && item.abilityStone.engravings.length > 0) { %>
+                            <div class="stone-section">
+                              <div class="stone-header">각인 효과</div>
+                              <% item.abilityStone.engravings.forEach(engraving => { %>
+                                <div class="accessory-option positive-engraving">
+                                  <span><%= engraving.name %></span>
+                                  <span class="accessory-option-value">+<%= engraving.level %></span>
+                                </div>
+                              <% }); %>
+                            </div>
+                          <% } %>
+                          
+                          <% if (item.abilityStone.negativeEngravings && item.abilityStone.negativeEngravings.length > 0) { %>
+                            <div class="stone-section">
+                              <div class="stone-header">감소 효과</div>
+                              <% item.abilityStone.negativeEngravings.forEach(engraving => { %>
+                                <div class="accessory-option negative-engraving">
+                                  <span><%= engraving.name %></span>
+                                  <span class="accessory-option-value negative">-<%= engraving.level %></span>
+                                </div>
+                              <% }); %>
+                            </div>
+                          <% } %>
+                        </div>
+                      <% } %>
+                    </div>
+                  </div>
+                <% }); %>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 보석 정보 -->
+      <div class="gems-section">
+        <h2 class="section-title">장착 보석</h2>
+        
+        <div class="gems-container">
+          <!-- 작열 보석 섹션 -->
+          <div class="gems-damage-section">
+            <h3>작열/홍염의 보석</h3>
+            <div class="gems-grid">
+              <% 
+              const damageGems = character.gems && Array.isArray(character.gems) 
+                ? character.gems.filter(gem => gem.type === 'damage')
+                : [];
+              
+              if (damageGems.length > 0) { 
+                damageGems.forEach(gem => { %>
+                  <div class="gem-item gem-damage">
+                    <div class="gem-header">
+                      <img src="<%= gem.icon %>" class="gem-icon" alt="<%= gem.name %>">
+                      <div class="gem-info">
+                        <div class="gem-name"><%= gem.name %></div>
+                        <div class="gem-level">레벨 <%= gem.level %></div>
+                      </div>
+                    </div>
+                    
+                    <div class="gem-effect">
+                      <% if (gem.skillIcon) { %>
+                        <img src="<%= gem.skillIcon %>" class="gem-skill-icon" alt="">
+                      <% } %>
+                      <div class="gem-effect-text"><%= gem.skillName %></div>
+                    </div>
+                  </div>
+                <% });
+              } else { %>
+                <div class="info-message">장착한 작열의 보석이 없습니다</div>
+              <% } %>
+            </div>
+          </div>
+          
+          <!-- 멸화 보석 섹션 -->
+          <div class="gems-cooldown-section">
+            <h3>겁화/멸화의 보석</h3>
+            <div class="gems-grid">
+              <% 
+              const cooldownGems = character.gems && Array.isArray(character.gems) 
+                ? character.gems.filter(gem => gem.type === 'cooldown')
+                : [];
+              
+              if (cooldownGems.length > 0) { 
+                cooldownGems.forEach(gem => { %>
+                  <div class="gem-item gem-cooldown">
+                    <div class="gem-header">
+                      <img src="<%= gem.icon %>" class="gem-icon" alt="<%= gem.name %>">
+                      <div class="gem-info">
+                        <div class="gem-name"><%= gem.name %></div>
+                        <div class="gem-level">레벨 <%= gem.level %></div>
+                      </div>
+                    </div>
+                    
+                    <div class="gem-effect">
+                      <% if (gem.skillIcon) { %>
+                        <img src="<%= gem.skillIcon %>" class="gem-skill-icon" alt="">
+                      <% } %>
+                      <div class="gem-effect-text"><%= gem.skillName %></div>
+                    </div>
+                  </div>
+                <% });
+              } else { %>
+                <div class="info-message">장착한 멸화의 보석이 없습니다</div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 각인 정보 -->
+      <div class="engravings-section">
+        <h2 class="section-title">각인 효과</h2>
+        
+        <div class="engravings-container">
+          <div class="engravings-active">
+            <h3>활성화된 각인</h3>
+            <%= JSON.stringify(character.engravingData.equipped) %>
+            <% if (character.engravingData.equipped) { %>
+              <% character.engravingData.equipped.forEach(engraving => { %>
+                <div class="engraving-item" data-bs-toggle="tooltip" data-bs-html="true" title="<%= engraving.description %>">
+                  <div class="engraving-info">
+                    <div class="engraving-name"></div>
+                    <div class="engraving-level">
+                      <span class="level-text"><%= engraving.level %> <%= engraving.name %> 
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              <% }); %>
+            <% } else { %>
+              <div class="engraving-item">
+                <div class="engraving-info">
+                  <div class="engraving-name">활성화된 각인이 없습니다</div>
+                </div>
+              </div>
+            <% } %>
+          </div>
+          
+          <div class="engravings-details">
+            <h3>각인 상세 정보</h3>
+            
+            <% 
+            // 각인 소스 정보 구성 (장착 각인서, 악세사리, 어빌리티 스톤 등)
+            const engravingSources = [];
+            
+            // 아크패시브에서 각인 정보 추가
+            if (character.arkpassive && character.arkpassive.ArkPassiveEffects && 
+                Array.isArray(character.arkpassive.ArkPassiveEffects)) {
+              character.arkpassive.ArkPassiveEffects.forEach(effect => {
+                if (effect.Name) {
+                  engravingSources.push({
+                    type: '아크패시브',
+                    name: effect.Name.replace(/<\/?[^>]+(>|$)/g, ''),
+                    level: `Lv.${effect.Level || effect.Tier || 1}`,
+                    icon: effect.Icon || '',
+                  });
+                }
+              });
+            }
+            
+            // 각인서 정보
+            if (character.engravings && character.engravings.Engravings && Array.isArray(character.engravings.Engravings)) {
+              character.engravings.Engravings.forEach(engraving => {
+                if (engraving.Name && engraving.Slot) {
+                  engravingSources.push({
+                    type: '각인서',
+                    name: engraving.Name.replace(/<\/?[^>]+(>|$)/g, ''),
+                    slot: engraving.Slot,
+                    icon: engraving.Icon || '',
+                  });
+                }
+              });
+            }
+            
+            // 악세사리 각인 정보
+            if (character.equipment && Array.isArray(character.equipment)) {
+              character.equipment.forEach(item => {
+                try {
+                  if (item.Type && ['목걸이', '귀걸이', '반지'].includes(item.Type) && item.ArmoryTooltip) {
+                    const tooltip = typeof item.ArmoryTooltip === 'string' ? 
+                      JSON.parse(item.ArmoryTooltip) : item.ArmoryTooltip;
+                    
+                    if (tooltip && tooltip.Element_005 && tooltip.Element_005.value && tooltip.Element_005.value.Element_000) {
+                      const engravingText = tooltip.Element_005.value.Element_000.contentStr;
+                      if (engravingText) {
+                        const engravings = engravingText.split('<BR>');
+                        
+                        engravings.forEach(eng => {
+                          const match = eng.match(/<FONT COLOR='#[A-F0-9]+'>(.*?)<\/FONT>/);
+                          if (match && match[1] && match[1].includes('+')) {
+                            const parts = match[1].split('+');
+                            if (parts.length === 2) {
+                              engravingSources.push({
+                                type: item.Type,
+                                name: parts[0].trim(),
+                                level: '+' + parts[1].trim(),
+                                icon: item.Icon || '',
+                              });
+                            }
+                          }
+                        });
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error('악세사리 각인 정보 파싱 오류:', e);
+                }
+              });
+            }
+            
+            // 어빌리티 스톤 각인 정보
+            if (character.equipment && Array.isArray(character.equipment)) {
+              try {
+                const abilityStone = character.equipment.find(item => item.Type === '어빌리티 스톤');
+                if (abilityStone && abilityStone.ArmoryTooltip) {
+                  const tooltip = typeof abilityStone.ArmoryTooltip === 'string' ? 
+                    JSON.parse(abilityStone.ArmoryTooltip) : abilityStone.ArmoryTooltip;
+                  
+                  if (tooltip && tooltip.Element_001 && tooltip.Element_001.Element_000) {
+                    // 각인 효과 추출
+                    const engravingPattern = /<FONT COLOR='#[A-F0-9]+'>(.*?)<\/FONT>/g;
+                    const tooltipText = tooltip.Element_001.Element_000.contentStr;
+                    let match;
+                    while ((match = engravingPattern.exec(tooltipText)) !== null) {
+                      if (match[1] && match[1].includes('+')) {
+                        const parts = match[1].split('+');
+                        if (parts.length === 2) {
+                          engravingSources.push({
+                            type: '어빌리티 스톤',
+                            name: parts[0].trim(),
+                            level: '+' + parts[1].trim(),
+                            icon: abilityStone.Icon || '',
+                          });
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('어빌리티 스톤 각인 정보 파싱 오류:', e);
+              }
+            }
+          %>
+          
+          <% if (engravingSources.length > 0) { %>
+            <% engravingSources.forEach(source => { %>
+              <div class="engraving-source source-<%= source.type.toLowerCase().replace(/\s+/g, '-') %>">
+                <% if (source.icon) { %>
+                  <img src="<%= source.icon %>" alt="<%= source.name %>" class="source-icon">
+                <% } %>
+                
+                <span class="source-type"><%= source.type %></span>
+                <span class="source-name"><%= source.name %></span>
+                <% if (source.level) { %>
+                  <span class="source-value"><%= source.level %></span>
+                <% } %>
+              </div>
+            <% }); %>
+          <% } else { %>
+            <div class="engraving-source">
+              <span class="source-name">각인 상세 정보가 없습니다</span>
+            </div>
+          <% } %>
+        </div>
+      </div>
+      
+      <!-- 아크패시브 정보 -->
+      <div class="arkpassive-section">
+        <h2 class="section-title">아크패시브</h2>
+          <% if(character.arkpassive) { %>
+            <%= JSON.stringify(character.arkpassive.Effects) %> 
+            <% character.arkpassive.Effects.forEach(effect => { %>
+                <div class="arkpassive-info"><%= effect.Description %>
+                </div>
+            <% }); %>
+          <% } %>
+      </div>
+    <% } %>
+  </div>
+
+  <script>
+    $(document).ready(function() {
+      // Bootstrap 5 툴팁 초기화
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+      var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+      });
+      
+      // 각인 아이템에 툴팁 추가
+      $('.engraving-item').each(function() {
+        const engravingName = $(this).find('.engraving-name').text();
+        const engravingLevel = $(this).find('.level-text').text();
+        
+        // 툴팁 내용 구성
+        const tooltipContent = `
+          <div class="engraving-tooltip">
+            <strong>${engravingName}</strong>
+            <div class="tooltip-level">${engravingLevel}</div>
+          </div>
+        `;
+        
+        // Bootstrap 5 툴팁 초기화
+        new bootstrap.Tooltip(this, {
+          html: true,
+          title: tooltipContent,
+          placement: 'top'
+        });
+      });
+    });
+  </script>
+</body>
+</html>
+
+

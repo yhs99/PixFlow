@@ -25,5 +25,6 @@ jobs:
           git pull origin main
           npm ci
           pkill -f "npm start" || true
-          nohup npm start > /production.log 2>&1 &
+          rm nohup.out
+          sudo nohup npm start &
         EOF
