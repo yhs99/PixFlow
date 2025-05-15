@@ -1361,7 +1361,6 @@ passport.use(new DiscordStrategy({
   const isGuildMember = profile.guilds?.some(guild => guild.id === '1194296331376803981');
   
   // 사용자 정보를 데이터베이스에 저장
-  console.log(profile);
   db.run(`
     INSERT INTO users (id, displayName, avatar, isGuildMember, last_updated)
     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
