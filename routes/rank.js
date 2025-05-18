@@ -3,6 +3,15 @@ const router = express.Router();
 const axios = require('axios');
 const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database('./gallery.db');
+const cron = require('node-cron');
+
+// 한국 시간 포맷팅 함수 추가
+function getKoreanDateTime() {
+  const now = new Date();
+  // 한국 시간으로 변환 (UTC+9)
+  now.setHours(now.getHours() + 9);
+  return now.toISOString().replace('T', ' ').substring(0, 19);
+}
 
 // 데이터베이스 정규화 - 여러 테이블 생성
 db.serialize(() => {
@@ -17,9 +26,42 @@ db.serialize(() => {
     guildName TEXT,
     data TEXT,
     lopec INTEGER DEFAULT 0,
+    specScore INTEGER DEFAULT 0,
     isGuildMember BOOLEAN DEFAULT 0,
     lastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // 기존 테이블에 specScore 컬럼이 없으면 추가
+  db.all("PRAGMA table_info(characters)", [], (err, rows) => {
+    if (err) {
+      console.error('테이블 정보 조회 오류:', err);
+      return;
+    }
+    
+    // 컬럼 목록에서 specScore 찾기
+    let hasSpecScore = false;
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        if (row.name === 'specScore') {
+          hasSpecScore = true;
+          break;
+        }
+      }
+    }
+    
+    if (!hasSpecScore) {
+      console.log('characters 테이블에 specScore 컬럼 추가');
+      db.run("ALTER TABLE characters ADD COLUMN specScore INTEGER DEFAULT 0", err => {
+        if (err) {
+          console.error('specScore 컬럼 추가 오류:', err);
+        } else {
+          console.log('specScore 컬럼이 성공적으로 추가되었습니다.');
+        }
+      });
+    } else {
+      console.log('specScore 컬럼이 이미 존재합니다.');
+    }
+  });
 
   // CASCADE 옵션이 있는 테이블을 정의하는 함수
   function createTableWithCascade(tableName) {
@@ -484,8 +526,8 @@ async function fetchAndSaveCharacterData(characterName, apiKey) {
     console.log(`캐릭터 정보: ${characterName}, 서버: ${serverName}, 클래스: ${characterClassName}, 레벨: ${characterLevel}, 아이템 레벨: ${itemLevel}, 길드: ${guildName}`);
     
     // 길드원이 아닐 경우 데이터 저장하지 않음
-    if (!isGuildMember) {
-      console.log(`${characterName}님은 ${GUILD_NAME} 길드원이 아닙니다.`);
+    if (!isGuildMember || profileData.itemLevel < 1640) {
+      console.log(`${characterName}는 저장 조건이 아닙니다.`);
       return { 
         success: false, 
         isGuildMember: false, 
@@ -493,21 +535,45 @@ async function fetchAndSaveCharacterData(characterName, apiKey) {
       };
     }
     
-    // 데이터베이스에 캐릭터 정보 저장
-    await new Promise((resolve, reject) => {
-      // 트랜잭션 시작
-      db.run('BEGIN TRANSACTION', (err) => {
-        if (err) {
-          console.error('트랜잭션 시작 오류:', err);
-          return reject(err);
-        }
-        
-        // 적절한 컬럼명 사용
-        console.log(`characters 테이블에 데이터 삽입 시도: ${characterName}`);
-        const query = `INSERT OR REPLACE INTO characters 
-                      (characterName, serverName, itemLevel, className, characterLevel, guildName, data, isGuildMember, ${timeColumn}) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`;
-        
+    // 트랜잭션 상태 확인 변수 추가
+    let inTransaction = false;
+    
+    try {
+      // 데이터베이스에 캐릭터 정보 저장
+      await new Promise((resolve, reject) => {
+        // 트랜잭션 시작
+        db.get('SELECT sqlite_version()', [], (err, result) => {
+          if (err) {
+            console.error('SQLite 버전 확인 오류:', err);
+            return reject(err);
+          }
+          
+          db.run('BEGIN TRANSACTION', (err) => {
+            if (err) {
+              // 이미 트랜잭션이 시작된 경우 무시하고 계속 진행
+              if (err.message && err.message.includes('cannot start a transaction within a transaction')) {
+                console.warn('이미 트랜잭션이 진행 중입니다. 새 트랜잭션 시작을 건너뜁니다.');
+                inTransaction = true;
+                return resolve();
+              }
+              console.error('트랜잭션 시작 오류:', err);
+              return reject(err);
+            }
+            
+            inTransaction = true;
+            resolve();
+          });
+        });
+      });
+      
+      // 적절한 컬럼명 사용
+      console.log(`characters 테이블에 데이터 삽입 시도: ${characterName}`);
+      const koreanDateTime = getKoreanDateTime();
+      const query = `INSERT OR REPLACE INTO characters 
+                    (characterName, serverName, itemLevel, className, characterLevel, guildName, data, isGuildMember, ${timeColumn}) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      
+      await new Promise((resolve, reject) => {
         db.run(query,
           [
             characterName,
@@ -518,121 +584,147 @@ async function fetchAndSaveCharacterData(characterName, apiKey) {
             guildName,
             JSON.stringify(profileData),
             isGuildMember ? 1 : 0,
+            koreanDateTime
           ],
           function(err) {
             if (err) {
               console.error('캐릭터 데이터 삽입 오류:', err);
-              db.run('ROLLBACK', () => reject(err));
+              reject(err);
             } else {
               console.log(`캐릭터 데이터 삽입 성공: ${characterName}, rowid: ${this.lastID}`);
-              db.run('COMMIT', (commitErr) => {
-                if (commitErr) {
-                  console.error('트랜잭션 커밋 오류:', commitErr);
-                  db.run('ROLLBACK', () => reject(commitErr));
-                } else {
-                  resolve();
-                }
-              });
+              resolve();
             }
           }
         );
       });
-    });
-    
-    // 테이블 매핑 정보
-    const tables = [
-      { name: 'equipment', data: dataMap.equipment },
-      { name: 'avatars', data: dataMap.avatars },
-      { name: 'combatSkills', data: dataMap.combatSkills },
-      { name: 'engravings', data: dataMap.engravings },
-      { name: 'cards', data: dataMap.cards },
-      { name: 'gems', data: dataMap.gems },
-      { name: 'colosseums', data: dataMap.colosseums },
-      { name: 'collectibles', data: dataMap.collectibles },
-      { name: 'arkpassive', data: dataMap.arkpassive }
-    ];
-    
-    // 각 테이블에 데이터 저장
-    for (const table of tables) {
-      if (!table.data) continue; // 데이터가 없으면 저장하지 않음
       
-      // 테이블이 존재하는지 먼저 확인
-      const tableExists = await new Promise((resolve, reject) => {
-        db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [table.name], (err, row) => {
-          if (err) return reject(err);
-          resolve(!!row);
-        });
-      });
+      // 테이블 매핑 정보
+      const tables = [
+        { name: 'equipment', data: dataMap.equipment },
+        { name: 'avatars', data: dataMap.avatars },
+        { name: 'combatSkills', data: dataMap.combatSkills },
+        { name: 'engravings', data: dataMap.engravings },
+        { name: 'cards', data: dataMap.cards },
+        { name: 'gems', data: dataMap.gems },
+        { name: 'colosseums', data: dataMap.colosseums },
+        { name: 'collectibles', data: dataMap.collectibles },
+        { name: 'arkpassive', data: dataMap.arkpassive }
+      ];
       
-      // 테이블이 없으면 생성
-      if (!tableExists) {
-        console.log(`테이블 '${table.name}'이 존재하지 않습니다. 테이블을 생성합니다.`);
+      // 각 테이블에 데이터 저장
+      for (const table of tables) {
+        if (!table.data) continue; // 데이터가 없으면 저장하지 않음
         
-        // 중요: CASCADE 제약조건이 있는 테이블 생성
-        await new Promise((resolve, reject) => {
-          db.run(`CREATE TABLE IF NOT EXISTS ${table.name} (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            characterName TEXT,
-            data TEXT,
-            ${timeColumn} DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (characterName) REFERENCES characters(characterName) ON DELETE CASCADE
-          )`, function(err) {
-            if (err) {
-              console.error(`테이블 ${table.name} 생성 오류:`, err);
-              reject(err);
-            } else {
-              console.log(`테이블 ${table.name}이 CASCADE 제약조건과 함께 생성되었습니다.`);
-              resolve();
-            }
-          });
-        });
-      } else {
-        // 테이블이 있으면 외래 키 제약조건 확인
-        const foreignKeys = await new Promise((resolve, reject) => {
-          db.all(`PRAGMA foreign_key_list(${table.name})`, [], (err, keys) => {
+        // 테이블이 존재하는지 먼저 확인
+        const tableExists = await new Promise((resolve, reject) => {
+          db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [table.name], (err, row) => {
             if (err) return reject(err);
-            resolve(keys || []);
+            resolve(!!row);
           });
         });
         
-        // CASCADE 제약조건이 있는지 확인
-        const hasCascadeConstraint = foreignKeys.some(fk => 
-          fk.table === 'characters' && 
-          fk.from === 'characterName' && 
-          fk.on_delete === 'CASCADE'
-        );
-        
-        if (!hasCascadeConstraint) {
-          console.log(`테이블 ${table.name}에 CASCADE 제약조건이 없지만, 이미 존재하는 테이블입니다. 초기화 시 재생성될 예정입니다.`);
+        // 테이블이 없으면 생성
+        if (!tableExists) {
+          console.log(`테이블 '${table.name}'이 존재하지 않습니다. 테이블을 생성합니다.`);
+          
+          // 중요: CASCADE 제약조건이 있는 테이블 생성
+          await new Promise((resolve, reject) => {
+            db.run(`CREATE TABLE IF NOT EXISTS ${table.name} (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              characterName TEXT,
+              data TEXT,
+              ${timeColumn} DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (characterName) REFERENCES characters(characterName) ON DELETE CASCADE
+            )`, function(err) {
+              if (err) {
+                console.error(`테이블 ${table.name} 생성 오류:`, err);
+                reject(err);
+              } else {
+                console.log(`테이블 ${table.name}이 CASCADE 제약조건과 함께 생성되었습니다.`);
+                resolve();
+              }
+            });
+          });
+        } else {
+          // 테이블이 있으면 외래 키 제약조건 확인
+          const foreignKeys = await new Promise((resolve, reject) => {
+            db.all(`PRAGMA foreign_key_list(${table.name})`, [], (err, keys) => {
+              if (err) return reject(err);
+              resolve(keys || []);
+            });
+          });
+          
+          // CASCADE 제약조건이 있는지 확인
+          const hasCascadeConstraint = foreignKeys.some(fk => 
+            fk.table === 'characters' && 
+            fk.from === 'characterName' && 
+            fk.on_delete === 'CASCADE'
+          );
+          
+          if (!hasCascadeConstraint) {
+            console.log(`테이블 ${table.name}에 CASCADE 제약조건이 없지만, 이미 존재하는 테이블입니다. 초기화 시 재생성될 예정입니다.`);
+          }
         }
+        
+        // 데이터 저장
+        await new Promise((resolve, reject) => {
+          const koreanDateTime = getKoreanDateTime();
+          const query = `INSERT OR REPLACE INTO ${table.name} 
+                        (characterName, data, ${timeColumn}) 
+                        VALUES (?, ?, ?)`;
+          
+          db.run(query,
+            [
+              characterName,
+              JSON.stringify(table.data),
+              koreanDateTime
+            ],
+            function(err) {
+              if (err) {
+                console.error(`데이터 저장 오류 (${table.name}):`, err);
+                reject(err);
+              } else {
+                resolve();
+              }
+            }
+          );
+        }).catch(err => {
+          console.warn(`${table.name} 테이블에 데이터 저장 실패, 계속 진행합니다:`, err);
+        });
       }
       
-      // 데이터 저장
-      await new Promise((resolve, reject) => {
-        const query = `INSERT OR REPLACE INTO ${table.name} 
-                      (characterName, data, ${timeColumn}) 
-                      VALUES (?, ?, CURRENT_TIMESTAMP)`;
-        
-        db.run(query,
-          [
-            characterName,
-            JSON.stringify(table.data),
-          ],
-          function(err) {
-            if (err) {
-              console.error(`데이터 저장 오류 (${table.name}):`, err);
-              reject(err);
+      // 트랜잭션이 시작된 경우에만 커밋
+      if (inTransaction) {
+        await new Promise((resolve, reject) => {
+          db.run('COMMIT', (commitErr) => {
+            if (commitErr) {
+              console.error('트랜잭션 커밋 오류:', commitErr);
+              db.run('ROLLBACK', () => reject(commitErr));
             } else {
+              console.log(`${characterName} 데이터 저장 트랜잭션 커밋 완료`);
               resolve();
             }
-          }
-        );
-      }).catch(err => {
-        console.warn(`${table.name} 테이블에 데이터 저장 실패, 계속 진행합니다:`, err);
-      });
+          });
+        });
+      }
+      
+      return { success: true, isGuildMember, characterName };
+    } catch (error) {
+      // 오류 발생 시 트랜잭션이 시작된 경우에만 롤백
+      if (inTransaction) {
+        await new Promise(resolve => {
+          db.run('ROLLBACK', (rollbackErr) => {
+            if (rollbackErr) {
+              console.error('트랜잭션 롤백 오류:', rollbackErr);
+            } else {
+              console.log(`${characterName} 데이터 저장 실패로 롤백 완료`);
+            }
+            resolve();
+          });
+        });
+      }
+      throw error;
     }
-    
-    return { success: true, isGuildMember, characterName };
   } catch (error) {
     console.error('API 데이터 처리 오류:', error);
     throw error;
@@ -800,23 +892,25 @@ router.get('/search', async (req, res) => {
           // 전체 원정대 캐릭터 수
           const totalSiblings = siblings.length;
           let processedCount = 0;
+          let guildMemberSiblings = [];
           
-          // 각 형제 캐릭터 처리 진행 상황 업데이트를 위한 래퍼 함수
-          const processSiblingWithProgress = async (sibling) => {
+          // 형제 캐릭터 순차적 처리 - Promise.all 대신 for 루프 사용
+          for (const sibling of siblings) {
             const siblingName = sibling.CharacterName;
             
-            // 이미 DB에 존재하고 최근에 업데이트되었는지 확인
-            const updateCheck = await shouldUpdateCharacter(siblingName);
-            const needsUpdate = updateCheck.needsUpdate;
-            
-            if (!sibling.CharacterName || sibling.ServerName !== '카제로스') {
+            // 서버 확인
+            if (!siblingName || sibling.ServerName !== '카제로스') {
               processedCount++;
               const percentage = 70 + Math.floor((processedCount / totalSiblings) * 20);
               sendProgress('siblings_processing', `원정대 캐릭터 처리 중 (${processedCount}/${totalSiblings}): ${siblingName} - 서버가 카제로스가 아닙니다.`, percentage);
-              return null;
+              continue;
             }
             
-            if (!needsUpdate) {
+            // 이미 DB에 존재하고 최근에 업데이트되었는지 확인
+            const siblingUpdateCheck = await shouldUpdateCharacter(siblingName);
+            const needsSiblingUpdate = siblingUpdateCheck.needsUpdate;
+            
+            if (!needsSiblingUpdate) {
               processedCount++;
               const percentage = 70 + Math.floor((processedCount / totalSiblings) * 20);
               sendProgress('siblings_processing', `원정대 캐릭터 처리 중 (${processedCount}/${totalSiblings}): ${siblingName} - 최근에 업데이트됨`, percentage);
@@ -830,44 +924,34 @@ router.get('/search', async (req, res) => {
               });
               
               if (existingSibling && existingSibling.isGuildMember) {
-                return siblingName;
+                guildMemberSiblings.push(siblingName);
               }
               
-              return null;
+              continue;
             }
             
             try {
-              // API 호출 및 데이터 저장
-              const result = await fetchAndSaveCharacterData(siblingName, apiKey);
+              // API 호출 및 데이터 저장 - 한 번에 하나의 캐릭터만 처리
+              const siblingResult = await fetchAndSaveCharacterData(siblingName, apiKey);
               processedCount++;
               const percentage = 70 + Math.floor((processedCount / totalSiblings) * 20);
               
-              if (result.success && result.isGuildMember) {
+              if (siblingResult.success && siblingResult.isGuildMember) {
                 sendProgress('siblings_processing', `원정대 캐릭터 처리 중 (${processedCount}/${totalSiblings}): ${siblingName} - 길드원 확인됨`, percentage);
-                return siblingName;
+                guildMemberSiblings.push(siblingName);
               } else {
                 sendProgress('siblings_processing', `원정대 캐릭터 처리 중 (${processedCount}/${totalSiblings}): ${siblingName} - 길드원이 아님`, percentage);
-                return null;
               }
             } catch (error) {
               processedCount++;
               const percentage = 70 + Math.floor((processedCount / totalSiblings) * 20);
               sendProgress('siblings_processing', `원정대 캐릭터 처리 중 (${processedCount}/${totalSiblings}): ${siblingName} - 오류 발생`, percentage);
               console.error(`형제 캐릭터 ${siblingName} 처리 중 오류 발생:`, error);
-              return null;
             }
             
-            // 1초 대기
+            // 각 캐릭터 처리 후 1초 대기
             await new Promise(resolve => setTimeout(resolve, 1000));
-          };
-          
-          // 형제 캐릭터 순차적 처리
-          const siblingPromises = [];
-          for (const sibling of siblings) {
-            siblingPromises.push(processSiblingWithProgress(sibling));
           }
-          
-          const guildMemberSiblings = (await Promise.all(siblingPromises)).filter(Boolean);
           
           if (guildMemberSiblings.length > 0) {
             sendProgress('siblings_complete', `${guildMemberSiblings.length}명의 길드원 캐릭터가 발견되었습니다.`, 90);
@@ -970,18 +1054,68 @@ router.post('/search', async (req, res) => {
     // 원정대 포함 옵션이 선택된 경우에만 형제 캐릭터 처리
     if (includeSiblings) {
       const siblingsUrl = `https://developer-lostark.game.onstove.com/characters/${encodeURIComponent(characterName)}/siblings`;
-    const siblingsResponse = await axios.get(siblingsUrl, {
-      headers: {
-        'accept': 'application/json',
-        'authorization': `bearer ${apiKey}`
-      }
-    });
+      const siblingsResponse = await axios.get(siblingsUrl, {
+        headers: {
+          'accept': 'application/json',
+          'authorization': `bearer ${apiKey}`
+        }
+      });
+      
       if (siblingsResponse.data) {
         const siblings = siblingsResponse.data;
-      const guildMemberSiblings = await fetchSiblingCharacters(siblings, apiKey, updateCheck.timeColumn);
-      
-      if (guildMemberSiblings.length > 0) {
-        console.log(`${characterName}님의 형제 캐릭터 중 별단 길드원:`, guildMemberSiblings);
+        console.log(`${siblings.length}명의 원정대 캐릭터 정보를 처리합니다.`);
+        
+        // 길드원인 형제 캐릭터 이름을 저장할 배열
+        const guildMemberSiblings = [];
+        
+        // 각 형제 캐릭터에 대해 API 호출 (동시에 너무 많은 요청을 보내지 않도록 순차적으로 처리)
+        for (const sibling of siblings) {
+          if (!sibling.CharacterName || sibling.ServerName !== '카제로스') {
+            console.log('서버가 카제로스가 아닙니다. 건너뜁니다.');
+            continue;
+          }
+
+          const siblingName = sibling.CharacterName;
+          
+          // 이미 DB에 존재하고 최근에 업데이트되었는지 확인
+          const siblingUpdateCheck = await shouldUpdateCharacter(siblingName);
+          const needsSiblingUpdate = siblingUpdateCheck.needsUpdate;
+          
+          if (!needsSiblingUpdate) {
+            console.log(`형제 캐릭터 ${siblingName}은(는) 최근에 업데이트되었습니다. 건너뜁니다.`);
+            
+            // 기존 데이터에서 길드원인지 확인
+            const existingSibling = await new Promise((resolve) => {
+              db.get(`SELECT isGuildMember FROM characters WHERE characterName = ?`, [siblingName], (err, row) => {
+                if (err || !row) resolve(null);
+                else resolve(row);
+              });
+            });
+            
+            if (existingSibling && existingSibling.isGuildMember) {
+              guildMemberSiblings.push(siblingName);
+            }
+            
+            continue;
+          }
+          
+          // API 호출 및 데이터 저장
+          try {
+            const siblingResult = await fetchAndSaveCharacterData(siblingName, apiKey);
+            
+            if (siblingResult.success && siblingResult.isGuildMember) {
+              guildMemberSiblings.push(siblingName);
+            }
+          } catch (error) {
+            console.error(`형제 캐릭터 ${siblingName} 처리 중 오류 발생:`, error);
+          }
+          
+          // 1초 대기
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (guildMemberSiblings.length > 0) {
+          console.log(`${characterName}님의 형제 캐릭터 중 별단 길드원:`, guildMemberSiblings);
         }
       }
     }
@@ -1198,209 +1332,220 @@ function transformCharacterData(raw) {
     lastUpdated: raw.characters.lastUpdated
   };
   
-  processed.equipment2 = raw.equipment;
-  // 엘릭서 정보 추출
-  for(const item of raw.equipment) {
-    if(item.Tooltip && item.Tooltip.includes('엘릭서')) {
-      console.log(extractElixir(item));
-    }
-  }
+  processed.stats = raw.characters.stats;
+  processed.tendencies = raw.characters.tendencies;
 
-  // 통계 정보 가공
-  // 장비 정보 가공 
+  processed.elixirLevels = 0;
   processed.equipment = Array.isArray(raw.equipment)
-    ? raw.equipment.filter(item => !['목걸이','귀걸이','반지','팔찌','어빌리티 스톤'].some(t => item.Type && item.Type.includes(t)))
+    ? raw.equipment.filter(item => ['투구', '어깨', '상의', '하의', '장갑', '무기'].some(t => item.Type && item.Type.includes(t)))
       .map(item => {
-        // 장비 데이터 구조 검사
-        if (!item.Tooltip) return { type: item.Type, name: item.Name, icon: item.Icon };
+        const result = {
+          type: item.Type, 
+          name: item.Name, 
+          icon: item.Icon,
+          grade: item.Grade,
+          reforgedLevel: 0
+        };
         
         let tooltip;
+        
         try {
-          tooltip = typeof item.Tooltip === 'string' ? JSON.parse(item.Tooltip) : item.Tooltip;
+          tooltip = item.Tooltip.replace(/<[^>]*>/g, '').trim();
+          tooltip = JSON.parse(tooltip);
         } catch (e) {
           console.error('장비 툴팁 파싱 오류:', e);
           return { type: item.Type, name: item.Name, icon: item.Icon };
         }
+        // 아이템 이름
+        if (tooltip.Element_000 && tooltip.Element_000.value) {
+          result.name = tooltip.Element_000.value;
+        }
+
+        // 상급재련
+        if (tooltip.Element_005 && tooltip.Element_005.value && typeof tooltip.Element_005.value === 'string') {
+          result.reforgedLevel = tooltip.Element_005.value.match(/(\d+)\s*단계/)[1];
+        }
         
-        // 기본 정보
-        const result = { 
-          type: item.Type, 
-          name: item.Name, 
-          icon: item.Icon 
-        };
-        
+        // 엘릭서
+        if (tooltip.Element_009 && tooltip.Element_009.value && typeof tooltip.Element_009.value.Element_000 !== 'undefined' && typeof tooltip.Element_009.value.Element_000 !== 'string') {
+          
+          if(!tooltip.Element_009.value.Element_000.topStr.includes('엘릭서')) {
+            result.transcendLevel = tooltip.Element_009.value.Element_000.topStr.match(/(\d+)\s*단계/)[1];
+            result.transcend = tooltip.Element_009.value.Element_000.topStr.split('단계')[1];
+          }
+        }
+
         // 품질
         if (tooltip.Element_001 && tooltip.Element_001.value && tooltip.Element_001.value.qualityValue !== undefined) {
           result.quality = tooltip.Element_001.value.qualityValue;
         }
-        
-        // 상급 재련 단계 추출
-        if (tooltip.Element_005 && tooltip.Element_005.value) {
-          const reforgedText = stripHtml(tooltip.Element_005.value);
-          const reforgedMatch = reforgedText.match(/(\d+)단계/);
-          if (reforgedMatch) {
-            result.reforgedLevel = parseInt(reforgedMatch[1], 10);
-          }
-        }
-        
-        // 초월 단계 추출
-        if (tooltip.Element_008) {
-          const keys = Object.keys(tooltip.Element_008.value || {});
-          if (keys.length > 0) {
-            const transcendHtml = tooltip.Element_008.value[keys[0]].topStr;
-            if (transcendHtml) {
-              const transcendText = stripHtml(transcendHtml);
-              const transcendMatch = transcendText.match(/(\d+)단계/);
-              if (transcendMatch) {
-                result.transcendLevel = parseInt(transcendMatch[1], 10);
-              }
+        // 엘릭서
+        if(tooltip.Element_009 && tooltip.Element_009.value && tooltip.Element_009.value.Element_000 && tooltip.Element_009.value.Element_000.topStr) {
+          let elixir = [];
+          if (tooltip.Element_009.value.Element_000.topStr.includes('엘릭서')) {
+            if (tooltip.Element_009.value.Element_000.contentStr.Element_000) {
+              elixir.push(parseElixir(tooltip.Element_009.value.Element_000.contentStr.Element_000.contentStr));
+              processed.elixirLevels += parseInt(tooltip.Element_009.value.Element_000.contentStr.Element_000.contentStr.split('Lv.')[1]) || 0;
             }
+            if (tooltip.Element_009.value.Element_000.contentStr.Element_001) {
+              elixir.push(parseElixir(tooltip.Element_009.value.Element_000.contentStr.Element_001.contentStr));
+              processed.elixirLevels += parseInt(tooltip.Element_009.value.Element_000.contentStr.Element_001.contentStr.split('Lv.')[1]) || 0;
+            }
+            result.elixir = elixir;
           }
         }
-        
-        
-        
+        if(tooltip.Element_010 && tooltip.Element_010.value && tooltip.Element_010.value.Element_000 && tooltip.Element_010.value.Element_000.contentStr && tooltip.Element_010.value.Element_000.contentStr.Element_000) {
+          let elixir = [];
+          if (tooltip.Element_010.value.Element_000.topStr.includes('엘릭서')) {
+            if (tooltip.Element_010.value.Element_000.contentStr.Element_000 && tooltip.Element_010.value.Element_000.contentStr.Element_000.contentStr) {
+              elixir.push(parseElixir(tooltip.Element_010.value.Element_000.contentStr.Element_000.contentStr));
+              processed.elixirLevels += parseInt(tooltip.Element_010.value.Element_000.contentStr.Element_000.contentStr.split('Lv.')[1]) || 0;
+            }
+            if (tooltip.Element_010.value.Element_000.contentStr.Element_001 && tooltip.Element_010.value.Element_000.contentStr.Element_001.contentStr) {
+              elixir.push(parseElixir(tooltip.Element_010.value.Element_000.contentStr.Element_001.contentStr));
+              processed.elixirLevels += parseInt(tooltip.Element_010.value.Element_000.contentStr.Element_001.contentStr.split('Lv.')[1]) || 0;
+            }
+            result.elixir = elixir;
+          }
+        }
         return result;
       })
+      // 장비 순서 정렬: 투구, 견갑, 상의, 하의, 장갑, 무기
+      .sort((a, b) => {
+        const order = {
+          '투구': 1,
+          '어깨': 2,
+          '상의': 3,
+          '하의': 4,
+          '장갑': 5,
+          '무기': 6
+        };
+        
+        const typeA = Object.keys(order).find(key => a.type && a.type.includes(key)) || '';
+        const typeB = Object.keys(order).find(key => b.type && b.type.includes(key)) || '';
+        
+        return order[typeA] - order[typeB];
+      })
     : [];
-
-  // 악세사리 (목걸이, 귀걸이, 반지, 팔찌, 어빌리티 스톤)
   processed.accessories = Array.isArray(raw.equipment)
-    ? raw.equipment.filter(item => ['목걸이','귀걸이','반지','팔찌','어빌리티 스톤'].some(t => item.Type && item.Type.includes(t)))
+    ? raw.equipment.filter(item => ['목걸이','귀걸이','반지'].some(t => item.Type && item.Type.includes(t)))
       .map(item => {
-        if (!item.Tooltip) return { 
+        const result = {
           type: item.Type, 
           name: item.Name, 
-          icon: item.Icon 
+          icon: item.Icon,
+          grade: item.Grade
         };
         
         let tooltip;
+        
         try {
-          tooltip = typeof item.Tooltip === 'string' ? JSON.parse(item.Tooltip) : item.Tooltip;
+          tooltip = item.Tooltip.replace(/<[^>]*>/g, '').trim();
+          tooltip = JSON.parse(tooltip);
         } catch (e) {
           console.error('악세사리 툴팁 파싱 오류:', e);
           return { type: item.Type, name: item.Name, icon: item.Icon };
         }
-        
-        // 기본 정보
-        const acc = { 
-          type: item.Type, 
-          name: item.Name, 
-          icon: item.Icon 
-        };
-        
+
         // 품질
-        if (tooltip.Element_001 && tooltip.Element_001.value && tooltip.Element_001.value.qualityValue !== undefined) {
-          acc.quality = tooltip.Element_001.value.qualityValue;
+        if (tooltip.Element_001 && tooltip.Element_001.value && tooltip.Element_001.value.qualityValue) {
+          result.quality = tooltip.Element_001.value.qualityValue;
         }
-        
-        // 기본 효과
-        const effects = [];
-        if (tooltip.Element_006 && tooltip.Element_006.value && tooltip.Element_006.value.Element_001) {
-          const baseStr = tooltip.Element_006.value.Element_001;
-          const parsedEffects = stripHtml(baseStr).split('<BR>')
-            .filter(s => s && s.trim().length > 0)
-            .map(s => stripHtml(s).trim());
-          
-          for (const effect of parsedEffects) {
-            if (effect.includes(':')) {
-              const [name, value] = effect.split(':').map(s => s.trim());
-              effects.push({ name, value });
-            } else {
-              effects.push({ name: effect, value: '' });
-            }
-          }
+
+        // 연마 효과
+        if (tooltip.Element_005 && tooltip.Element_005.value) {
+          result.accessoryEffects = parseAccessoryEffect(tooltip.Element_005.value.Element_001);
         }
-        
-        if (effects.length > 0) {
-          acc.effects = effects;
+        return result;
+      })
+    : [];
+
+    processed.bracelet = Array.isArray(raw.equipment)
+    ? raw.equipment.filter(item => ['팔찌'].some(t => item.Type && item.Type.includes(t)))
+      .map(item => {
+        const result = {
+          type: item.Type,
+          name: item.Name,
+          icon: item.Icon,
+          grade: item.Grade
+        };
+        let tooltip;
+        try {
+          tooltip = JSON.parse(item.Tooltip);
+        } catch (e) {
+          console.error('팔찌 툴팁 파싱 오류:', e);
+          return { type: item.Type, name: item.Name, icon: item.Icon };
         }
         
         // 팔찌 효과
-        if (item.Type && item.Type.includes('팔찌')) {
-          // 3. 팔찌 옵션 데이터 보강
-          const braceletEffects = [];
-          
-          // 기본 효과 처리
-          if (effects.length > 0) {
-            braceletEffects.push(...effects.map(e => ({
-              type: '기본효과',
-              name: e.name,
-              value: e.value
-            })));
-          }
-          
-          // 추가 효과 처리 (Element_007)
-          if (tooltip.Element_007 && tooltip.Element_007.value) {
-            const additionalStr = typeof tooltip.Element_007.value === 'string' ? 
-              tooltip.Element_007.value : 
-              (tooltip.Element_007.value.Element_001 || '');
-            
-            const additionalEffects = stripHtml(additionalStr).split('<BR>')
-              .filter(s => s && s.trim().length > 0)
-              .map(s => stripHtml(s).trim());
-              
-            for (const effect of additionalEffects) {
-              if (effect.includes(':')) {
-                const [name, value] = effect.split(':').map(s => s.trim());
-                braceletEffects.push({ type: '추가효과', name, value });
-              } else if (effect) {
-                braceletEffects.push({ type: '추가효과', name: effect, value: '' });
-              }
-            }
-          }
-          
-          acc.braceletEffects = braceletEffects;
-        }
-        
-        // 어빌리티 스톤 각인
-        if (item.Type && item.Type.includes('어빌리티 스톤')) {
-          // 6. 어빌리티 스톤 처리 보강
-          acc.abilityStone = {
-            effects: effects.map(e => ({ name: e.name, value: e.value })),
-            engravings: [],
-            negativeEngravings: []
+        if (tooltip.Element_004 && tooltip.Element_004.value) {
+          // 팔찌 효과 분석 및 등급 판별          
+          const blocks = tooltip.Element_004.value.Element_001.split(/(?=<img[^>]*>)/g)
+          .filter(Boolean);
+          const blockEffects = {
+            'defaultEffects': [],
+            'lockedEffects': []
           };
-          
-          // 각인 효과
-          const engr = [];
-          const negativeEngr = [];
-          const txt = tooltip.Element_006?.value?.Element_001 || '';
-          if (txt) {
-            const pattern = /<FONT COLOR='#[A-F0-9]+'>(.+?)<\/FONT>/g;
-            let m;
-            while ((m = pattern.exec(txt))) {
-              if (m[1] && m[1].includes('+')) {
-                const parts = m[1].split('+');
-                if (parts.length === 2) {
-                  // 양수인 경우 일반 각인, 음수인 경우 페널티 각인
-                  const level = parseInt(parts[1].trim(), 10);
-                  const engraving = { 
-                    name: parts[0].trim(), 
-                    level: Math.abs(level),
-                    description: '' // tooltip으로 표시할 설명
-                  };
-                  
-                  if (level < 0) {
-                    negativeEngr.push(engraving);
-                  } else {
-                    engr.push(engraving);
-                  }
-                }
-              }
-            }
-          }
-          
-          if (engr.length > 0) {
-            acc.abilityStone.engravings = engr;
-          }
-          
-          if (negativeEngr.length > 0) {
-            acc.abilityStone.negativeEngravings = negativeEngr;
-          }
+          blocks.forEach(block => {
+              blockEffects.defaultEffects.push(block.replace(/<[^>]*>/g, '').trim());
+          });
+          result.braceletEffects = blockEffects;
         }
-        
-        return acc;
+
+        return result;
+      })
+    : [];
+    
+    processed.abilityStone = Array.isArray(raw.equipment)
+    ? raw.equipment.filter(item => ['어빌리티 스톤'].some(t => item.Type && item.Type.includes(t)))
+      .map(item => {
+        const result = {
+          type: item.Type,
+          name: item.Name,
+          icon: item.Icon,
+          grade: item.Grade
+        };
+        let tooltip;
+        try {
+          tooltip = item.Tooltip.replace(/<[^>]*>/g, '').trim();
+          tooltip = JSON.parse(tooltip);
+        } catch (e) {
+          console.error('어빌리티 스톤 툴팁 파싱 오류:', e);
+          return { type: item.Type, name: item.Name, icon: item.Icon };
+        }
+        if(tooltip.Element_006 && tooltip.Element_006.value) {
+          let abilityStoneEffects = [];
+          abilityStoneEffects.push(tooltip.Element_006.value.Element_000.contentStr.Element_000.contentStr);
+          abilityStoneEffects.push(tooltip.Element_006.value.Element_000.contentStr.Element_001.contentStr);
+          abilityStoneEffects.push(tooltip.Element_006.value.Element_000.contentStr.Element_002.contentStr);
+          if(tooltip.Element_006.value.Element_000.contentStr.Element_003) {
+            abilityStoneEffects.push(tooltip.Element_006.value.Element_000.contentStr.Element_003.contentStr);
+          }
+          result.abilityStoneEffects = abilityStoneEffects;
+        }else if (tooltip.Element_005 && tooltip.Element_005.value) {
+          let abilityStoneEffects = [];
+          abilityStoneEffects.push(tooltip.Element_005.value.Element_000.contentStr.Element_000.contentStr);
+          abilityStoneEffects.push(tooltip.Element_005.value.Element_000.contentStr.Element_001.contentStr);
+          abilityStoneEffects.push(tooltip.Element_005.value.Element_000.contentStr.Element_002.contentStr);
+          if(tooltip.Element_005.value.Element_000.contentStr.Element_003) {
+            abilityStoneEffects.push(tooltip.Element_005.value.Element_000.contentStr.Element_003.contentStr);
+          }
+          result.abilityStoneEffects = abilityStoneEffects;
+        }
+
+        return result;
+      })
+    : [];
+
+    processed.etc = Array.isArray(raw.equipment)
+    ? raw.equipment.filter(item => ['나침반', '부적', '문장'].some(t => item.Type && item.Type.includes(t)))
+      .map(item => {
+        return {
+          type: item.Type,
+          name: item.Name,
+          icon: item.Icon,
+          grade: item.Grade
+        }
       })
     : [];
 
@@ -1426,6 +1571,7 @@ function transformCharacterData(raw) {
         return { 
           icon: gem.Icon, 
           skillIcon: gem.SkillIcon, 
+          grade: gem.Grade,
           name, 
           level, 
           type, 
@@ -1435,13 +1581,30 @@ function transformCharacterData(raw) {
     : [];
 
   // 수집형 포인트
-  processed.collectibles = raw.collectibles
-    ? {
-        Points: raw.collectibles.Points,
-        MaxPoint: raw.collectibles.MaxPoint,
-        percentage: raw.collectibles.MaxPoint ? Math.floor(raw.collectibles.Points / raw.collectibles.MaxPoint * 100) : 0
-      }
-    : {};
+  processed.collectibles = Array.isArray(raw.collectibles) 
+    ? raw.collectibles.map(collectible => {
+      const result = {
+        type: collectible.Type,
+        icon: collectible.Type === '모코코 씨앗' ? '/icon_02_new.png' : 
+              collectible.Type === '섬의 마음' ? '/icon_01_new.png' : 
+              collectible.Type === '위대한 미술품' ? '/icon_03_new.png' : 
+              collectible.Type === '거인의 심장' ? '/icon_00_new.png' : 
+              collectible.Type === '이그네아의 징표' ? '/icon_06_new.png' : 
+              collectible.Type === '항해 모험물' ? '/icon_04_new.png' : 
+              collectible.Type === '오르페우스의 별' ? '/icon_07_new.png' : 
+              collectible.Type === '기억의 오르골' ? '/icon_08_new.png' : 
+              collectible.Type === '크림스네일의 해도' ? '/icon_09_new.png' : 
+              collectible.Type === '세계수의 잎' ? '/icon_05_new.png' : 
+              collectible.Icon,
+        name: collectible.Name,
+        points: collectible.Point,
+        maxPoints: collectible.MaxPoint,
+        percentage: collectible.MaxPoint ? Math.floor(collectible.Point / collectible.MaxPoint * 100) : 0,
+        CollectiblePoints: collectible.CollectiblePoints
+      };
+      return result;
+    })
+    : [];
 
   // PVP 정보
   processed.colosseums = raw.colosseums || {};
@@ -1456,102 +1619,55 @@ function transformCharacterData(raw) {
     : [];
 
   // 각인 (ArkPassiveEffects)
-  if (raw.arkpassive && raw.arkpassive.ArkPassiveEffects) {
-    processed.engravings = Array.isArray(raw.arkpassive.ArkPassiveEffects)
-      ? raw.arkpassive.ArkPassiveEffects.map(e => ({
+  if (raw.engravings && raw.engravings.ArkPassiveEffects) {
+    processed.engravings = Array.isArray(raw.engravings.ArkPassiveEffects)
+      ? raw.engravings.ArkPassiveEffects.map(e => ({
+          abilityStoneLevel: e.AbilityStoneLevel ? e.AbilityStoneLevel : 0,
           name: stripHtml(e.Name || ''),
-          level: e.Level,
-          icon: e.Icon || ''
+          level: e.Level ? e.Level : 0,
+          icon: `/${e.Name}.webp`,
+          description: e.Description,
+          grade: e.Grade
         }))
       : [];
-  } else if (raw.engravings && raw.engravings.Effects) {
-    processed.engravings = Array.isArray(raw.engravings.Effects)
-      ? raw.engravings.Effects.map(e => ({
-          name: stripHtml(e.Name || ''),
-          level: e.Level,
-          icon: e.Icon || ''
-        }))
-      : [];
-  } else {
-    processed.engravings = [];
   }
 
   // 카드
-  processed.cards = Array.isArray(raw.cards) ? raw.cards : [];
+  processed.cards = Array.isArray(raw.cards.Cards) ? raw.cards.Cards : [];
 
-  // 아크패시브
-  processed.arkpassive = {};
-  
-  if (raw.arkpassive) {
-    processed.arkpassive = {
-      // Points 배열 처리
-      Points: raw.arkpassive.Points || [],
-      // 전체 효과 처리
-      Effects: raw.arkpassive.Effects || []
+  if (raw.arkpassive && raw.arkpassive.IsArkPassive) {
+    const arkpassives = {
+      evolution: {
+        points: {},
+        effects: []
+      },
+      awakening: {
+        points: {},
+        effects: []
+      },
+      leap: {
+        points: {},
+        effects: []
+      }
     };
-    
-    // 5. 아크패시브 분류 (진화, 깨달음, 도약)
-    const arkPassiveCategories = {
-      evolution: [], // 진화
-      awakening: [], // 깨달음
-      leap: []       // 도약
-    };
-    
-    if (Array.isArray(raw.arkpassive.ArkPassiveEffects)) {
-      raw.arkpassive.ArkPassiveEffects.forEach(effect => {
-        const name = stripHtml(effect.Name || '');
-        const category = name.includes('진화') ? 'evolution' :
-                         name.includes('깨달음') ? 'awakening' :
-                         name.includes('도약') ? 'leap' : 'other';
-        
-        if (category !== 'other') {
-          arkPassiveCategories[category].push({
-            name,
-            level: effect.Level || effect.Tier || 1,
-            icon: effect.Icon || '',
-            description: stripHtml(effect.Description || '')
-          });
-        }
+    if(raw.arkpassive.Points) {
+      raw.arkpassive.Points.forEach(point => {
+        point.Name === '진화' ? arkpassives.evolution.points = point : 
+        point.Name === '깨달음' ? arkpassives.awakening.points = point : 
+        arkpassives.leap.points = point;
       });
     }
-    
-    processed.arkpassive.categories = arkPassiveCategories;
-    
-    // ActiveAwakeningEngraving이 있으면 메인 정보로 활용
-    if (raw.arkpassive.ActiveAwakeningEngraving) {
-      const act = raw.arkpassive.ActiveAwakeningEngraving;
-      const tier = raw.arkpassive.AwakeningTier || act.Tier || 1;
-      const desc = act.Description ? stripHtml(act.Description) : '';
-      
-      let tierEff = '';
-      if (Array.isArray(act.AwakeningEffects) && act.AwakeningEffects[tier - 1]) {
-        tierEff = stripHtml(act.AwakeningEffects[tier - 1].Description || '');
-      }
-      
-      processed.arkpassive.name = stripHtml(act.Name || '');
-      processed.arkpassive.icon = act.Icon || '';
-      processed.arkpassive.tier = tier;
-      processed.arkpassive.description = desc;
-      processed.arkpassive.tierEffect = tierEff;
+
+    if(raw.arkpassive.Effects) {
+      raw.arkpassive.Effects.forEach(effect => {
+        effect.Name === '진화' ? arkpassives.evolution.effects.push(effect) : 
+        effect.Name === '깨달음' ? arkpassives.awakening.effects.push(effect) : 
+        arkpassives.leap.effects.push(effect);
+      });
     }
-  }
 
-  // 4. Engravings 데이터 처리 (ArkPassiveEffects)
-  processed.engravingData = {};
-  if (raw.engravings.ArkPassiveEffects) {
-    processed.engravingData.equipped = raw.engravings.ArkPassiveEffects.map(eng => ({
-      name: eng.Name,
-      level: eng.Level,
-      grade: eng.Grade,
-      description: eng.Description,
-      AbilityStoneLevel: eng.AbilityStoneLevel ? eng.AbilityStoneLevel : 0,
-    }));
+    processed.arkpassive = arkpassives;
   }
-  if (raw.arkpassive) {
-    processed.arkpassive.points = raw.arkpassive.Points;
-    processed.arkpassive.effects = raw.arkpassive.Effects;
-  }
-
   return processed;
 }
 
@@ -1671,6 +1787,7 @@ router.get('/character/:name', async (req, res) => {
           const rawMap = {};
           results.forEach(r => Object.assign(rawMap, r));
           // DB에서 조회한 기본 캐릭터 정보도 추가
+          const data = JSON.parse(character.data);
           rawMap.characters = {
             CharacterName: character.characterName,
             ServerName: character.serverName,
@@ -1679,7 +1796,9 @@ router.get('/character/:name', async (req, res) => {
             ItemAvgLevel: character.itemLevel.toString(),
             CharacterImage: character.data ? JSON.parse(character.data)?.CharacterImage || '' : '',
             GuildName: character.guildName,
-            lastUpdated: character[timeColumn] || '정보 없음'
+            lastUpdated: character[timeColumn] || '정보 없음',
+            stats: data.Stats,
+            tendencies: data.Tendencies
           };
           // 가공 함수 호출
           const processed = transformCharacterData(rawMap);
@@ -1726,4 +1845,474 @@ router.get('/api/characters', async (req, res) => {
     });
   }
 });
+
+function parseElixir(elixir) {
+  const elixirOptions = ['회심', '달인', '행운', '칼날 방패', '진군', '신념', '선봉대', '선각자', , '강맹', '무기 공격력', '공격력', '힘', '민첩', '지능', '무력화', '마나', '물약 중독', '방랑자', '생명의 축복', '자원의 축복', '탈출의 달인', '폭발물 달인', '회피의 달인', '마법 방어력', '물리 방어력', '받는 피해 감소', '최대 생명력', '아군 강화', '아이덴티티 획득', '추가 피해', '치명타 피해', '각성기 피해', '보스 피해', '보호막 강화', '회복 강화'];
+  
+  const level = (elixir.match(/Lv\.\d+/) || [''])[0];
+  const name = elixirOptions.find(opt => opt && elixir.includes(opt)) || 'UNKNOWN';
+  return `${name} ${level}`.trim();
+}
+
+// 매일 오전 2시에 실행되는 데이터 갱신 스케줄러
+cron.schedule('0 2 * * *', async () => {
+  console.log('자동 데이터 갱신 스케줄러 실행 - 오전 2시');
+  await refreshAllCharactersData();
+});
+
+// 모든 캐릭터 데이터 갱신 함수
+async function refreshAllCharactersData() {
+  try {
+    console.log('모든 캐릭터 데이터 갱신 시작');
+    
+    // API 키 가져오기
+    const apiKey = process.env.LOSTARK_API_KEY || 'YOUR_API_KEY';
+    
+    // 최근 1시간 내에 업데이트되지 않은 캐릭터만 조회
+    const characters = await new Promise((resolve, reject) => {
+      const oneHourAgo = new Date();
+      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+      
+      // SQLite에서 날짜 비교를 위한 포맷 (ISO 문자열)
+      const timeThreshold = oneHourAgo.toISOString();
+      
+      db.all(
+        `SELECT characterName, lastUpdated FROM characters 
+         WHERE lastUpdated IS NULL OR lastUpdated < ?`, 
+        [timeThreshold], 
+        (err, rows) => {
+          if (err) {
+            console.error('캐릭터 목록 조회 오류:', err);
+            return reject(err);
+          }
+          resolve(rows);
+        }
+      );
+    });
+    
+    console.log(`최근 1시간 내 업데이트되지 않은 캐릭터 수: ${characters.length}개`);
+    
+    // 각 캐릭터별로 API 요청 (비동기 처리)
+    const results = [];
+    
+    // API 요청 병목 현상 방지를 위해 순차 처리
+    for (const character of characters) {
+      const characterName = character.characterName;
+      console.log(`${characterName} 데이터 갱신 시작 (마지막 업데이트: ${character.lastUpdated || '없음'})`);
+      
+      try {
+        // API 요청 및 데이터 저장
+        const result = await fetchAndSaveCharacterData(characterName, apiKey);
+        results.push({ characterName, success: result.success, isGuildMember: result.isGuildMember });
+        
+        // 길드원이 아닌 캐릭터는 삭제
+        if (result.success && !result.isGuildMember) {
+          console.log(`${characterName}은(는) 더 이상 길드원이 아니므로 데이터 삭제`);
+          
+          // 외래 키 제약조건 활성화
+          await new Promise((resolve, reject) => {
+            db.run('PRAGMA foreign_keys = ON', err => {
+              if (err) return reject(err);
+              resolve();
+            });
+          });
+          
+          // 캐릭터 삭제 (CASCADE로 관련 데이터도 자동 삭제)
+          await new Promise((resolve, reject) => {
+            db.run(`DELETE FROM characters WHERE characterName = ?`, [characterName], function(err) {
+              if (err) return reject(err);
+              console.log(`${characterName} 삭제 완료 (길드원 아님)`);
+              resolve();
+            });
+          });
+        }
+        
+        // API 요청 사이 간격 (1초)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`${characterName} 데이터 갱신 중 오류:`, error);
+        results.push({ characterName, success: false, error: error.message });
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('캐릭터 데이터 갱신 오류:', error);
+    throw error;
+  }
+}
+
+// 수동으로 모든 캐릭터 데이터 갱신하는 API
+router.get('/api/refresh-all', async (req, res) => {
+  try {
+    const results = await refreshAllCharactersData();
+    res.json({ 
+      success: true,
+      message: '모든 캐릭터 데이터 갱신 완료',
+      results
+    });
+  } catch (error) {
+    console.error('데이터 갱신 API 오류:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '데이터 갱신 중 오류가 발생했습니다.',
+      error: error.message 
+    });
+  }
+});
+
+// 단일 캐릭터 정보를 갱신하는 API
+router.get('/api/refresh-character/:name', async (req, res) => {
+  try {
+    const characterName = req.params.name;
+    
+    if (!characterName) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '캐릭터 이름이 필요합니다.' 
+      });
+    }
+    
+    console.log(`단일 캐릭터 정보 갱신 요청: ${characterName}`);
+    
+    // API 키 가져오기
+    const apiKey = process.env.LOSTARK_API_KEY || 'YOUR_API_KEY';
+    
+    // 마지막 업데이트 시간 확인
+    const updateCheck = await shouldUpdateCharacter(characterName);
+    const needsUpdate = updateCheck.needsUpdate;
+    const timeColumn = updateCheck.timeColumn;
+    
+    // 이미 최근에 업데이트되었는지 확인 (1분 이내)
+    if (!needsUpdate) {
+      const character = await new Promise((resolve, reject) => {
+        db.get(`SELECT * FROM characters WHERE characterName = ?`, [characterName], (err, row) => {
+          if (err) return reject(err);
+          resolve(row);
+        });
+      });
+      
+      if (!character) {
+        return res.status(404).json({ 
+          success: false, 
+          message: '캐릭터 정보를 찾을 수 없습니다.' 
+        });
+      }
+      
+      const lastUpdated = new Date(character[timeColumn]);
+      const now = new Date();
+      const diffSeconds = Math.floor((now - lastUpdated) / 1000);
+      
+      if (diffSeconds < 60) {
+        return res.status(429).json({ 
+          success: false, 
+          message: `최근에 이미 갱신되었습니다. ${60 - diffSeconds}초 후에 다시 시도해주세요.` 
+        });
+      }
+    }
+    
+    // API 호출 및 데이터 저장
+    const result = await fetchAndSaveCharacterData(characterName, apiKey);
+    
+    if (!result.success) {
+      return res.status(500).json({ 
+        success: false, 
+        message: '캐릭터 정보를 가져오는데 실패했습니다.' 
+      });
+    }
+    
+    if (!result.isGuildMember) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `'${characterName}'님은 별단 길드원이 아닙니다.` 
+      });
+    }
+    
+    // 성공 응답
+    res.json({ 
+      success: true, 
+      message: '캐릭터 정보가 성공적으로 갱신되었습니다.',
+      characterName
+    });
+    
+  } catch (error) {
+    console.error('캐릭터 갱신 API 오류:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '서버 오류가 발생했습니다.' 
+    });
+  }
+});
+
+  function parseAccessoryEffect(effectStr) {
+    const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const namePattern = Object.keys(accessoryEffectGrades)
+    .sort((a, b) => b.length - a.length)      // 긴 이름 우선
+    .map(escape)
+    .join('|');
+    const regex = new RegExp(`(${namePattern})\\s*\\+\\s*([0-9.]+%?)`, 'g');
+    // 2) 매칭 반복
+    const result = [];
+    let m;
+    while ((m = regex.exec(effectStr)) !== null) {
+      const rawName = m[1];            // ex) "공격력", "무기 공격력%"
+      const value   = m[2];            // ex) "0.95%", "195"
+
+      // 2-1) 이름 표시용('%' 제외)
+      const name = rawName.replace('%', '');
+
+      // 2-2) 등급(상·중·하) 판정
+      let grade = 'Unknown';
+      const candidates = [
+        rawName,
+        rawName.endsWith('%') ? rawName.slice(0, -1) : rawName + '%',
+        name,
+        name + '%'
+      ];
+      outer: for (const key of candidates) {
+        const tiers = accessoryEffectGrades[key];
+        if (!tiers) continue;
+        for (const tier of Object.values(tiers)) {
+          for (const [g, v] of Object.entries(tier)) {
+            if (v === value) { grade = g; break outer; }
+          }
+        }
+      }
+
+      result.push({ name, grade, value });
+    }
+    return result;
+  }
+
+  const accessoryEffectGrades = {
+    '아군 피해량 강화 효과' : {
+      'T4' : {
+        '상' : '7.50%',
+        '중' : '4.50%',
+        '하' : '2.00%'
+      },
+      'T3' : {
+        '상' : '4.32%',
+        '중' : '2.58%',
+        '하' : '1.14%'
+      }
+    },
+    '아군 공격력 강화 효과' : {
+      'T4' : {
+        '상' : '5.00%',
+        '중' : '3.00%',
+        '하' : '1.35%'
+      },
+      'T3' : {
+        '상' : '2.88%',
+        '중' : '1.72%',
+        '하' : '0.76%'
+      }
+    },
+    '적에게 주는 피해' : {
+      'T4' : {
+        '상' : '2.00%',
+        '중' : '1.20%',
+        '하' : '0.55%'
+      },
+      'T3' : {
+        '상' : '1.15%',
+        '중' : '0.69%',
+        '하' : '0.30%'
+      }
+    },
+    '추가 피해' : {
+      'T4' : {
+        '상' : '2.60%',
+        '중' : '1.60%',
+        '하' : '0.70%'
+      },
+      'T3' : {
+        '상' : '1.50%',
+        '중' : '0.90%',
+        '하' : '0.39%'
+      }
+    },
+    '공격력%' : {
+      'T4' : {
+        '상' : '1.55%',
+        '중' : '0.95%',
+        '하' : '0.40%'
+      },
+      'T3' : {
+        '상' : '0.89%',
+        '중' : '0.54%',
+        '하' : '0.24%'
+      }
+    },
+    '무기 공격력%' : {
+      'T4' : {
+        '상' : '3.00%',
+        '중' : '1.80%',
+        '하' : '0.80%'
+      },
+      'T3' : {
+        '상' : '1.72%',
+        '중' : '1.04%',
+        '하' : '0.46%'
+      }
+    },
+    '파티원 회복 효과' : {
+      'T4' : {
+        '상' : '3.50%',
+        '중' : '2.10%',
+        '하' : '0.95%'
+      },
+      'T3' : {
+        '상' : '2.01%',
+        '중' : '1.21%',
+        '하' : '0.54%'
+      }
+    },
+    '파티원 보호막 효과' : {
+      'T4' : {
+        '상' : '3.50%',
+        '중' : '2.10%',
+        '하' : '0.95%'
+      },
+      'T3' : {
+        '상' : '2.01%',
+        '중' : '1.21%',
+        '하' : '0.54%'
+      }
+    },
+    '세레나데, 신앙, 조화 게이지 획득량' : {
+      'T4' : {
+        '상' : '6.00%',
+        '중' : '3.60%',
+        '하' : '1.60%'
+      },
+      'T3' : {
+        '상' : '3.45%',
+        '중' : '2.07%',
+        '하' : '0.90%'
+      }
+    },
+    '낙인력' : {
+      'T4' : {
+        '상' : '8.00%',
+        '중' : '4.80%',
+        '하' : '2.15%'
+      },
+      'T3' : {
+        '상' : '4.60%',
+        '중' : '2.76%',
+        '하' : '1.20%'
+      }
+    },
+    '치명타 적중률' : {
+      'T4' : {
+        '상' : '1.55%',
+        '중' : '0.95%',
+        '하' : '0.40%'
+      },
+      'T3' : {
+        '상' : '0.89%',
+        '중' : '0.54%',
+        '하' : '0.24%'
+      }
+    },
+    '치명타 피해' : {
+      'T4' : {
+        '상' : '4.00%',
+        '중' : '2.40%',
+        '하' : '1.10%'
+      },
+      'T3' : {
+        '상' : '2.30%',
+        '중' : '1.38%',
+        '하' : '0.61%'
+      }
+    },
+    '최대 생명력' : {
+      'T4' : {
+        '상' : '6500',
+        '중' : '3250',
+        '하' : '1300'
+      },
+      'T3' : {
+        '상' : '2756',
+        '중' : '1654',
+        '하' : '719'
+      }
+    },
+    '공격력' : {
+      'T4' : {
+        '상' : '390',
+        '중' : '195',
+        '하' : '80'
+      },  
+      'T3' : {
+        '상' : '68',
+        '중' : '33',
+        '하' : '14'
+      }
+    },
+    '무기 공격력' : {
+      'T4' : {
+        '상' : '960',
+        '중' : '480',
+        '하' : '195'
+      },  
+      'T3' : {
+        '상' : '155',
+        '중' : '75',
+        '하' : '32'
+      }
+    },
+    '최대 마나' : {
+      'T4' : {
+        '상' : '30',
+        '중' : '15',
+        '하' : '6'
+      },  
+      'T3' : {
+        '상' : '17',
+        '중' : '10',
+        '하' : '5'
+      }
+    },
+    '상태이상 공격 지속시간' : {
+      'T4' : {
+        '상' : '1.00%',
+        '중' : '0.50%',
+        '하' : '0.20%'
+      },  
+      'T3' : {
+        '상' : '0.58%',
+        '중' : '0.35%',
+        '하' : '0.15%'
+      }
+    },
+    '최대 마나' : {
+      'T4' : {
+        '상' : '30',
+        '중' : '15',
+        '하' : '6'
+      },  
+      'T3' : {
+        '상' : '21',
+        '중' : '13',
+        '하' : '5'
+      }
+    },
+    '전투 중 생명력 회복량' : {
+      'T4' : {
+        '상' : '50',
+        '중' : '25',
+        '하' : '10'
+      },
+      'T3' : {
+        '상' : '21',
+        '중' : '13',
+        '하' : '5'
+      }
+    }
+  };
+
 module.exports = router;

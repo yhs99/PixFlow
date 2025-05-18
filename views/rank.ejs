@@ -607,6 +607,44 @@
       border-style: solid;
       border-color: rgba(10, 25, 47, 0.95) transparent transparent transparent;
     }
+    
+    /* 필터 버튼 스타일 */
+    .filter-group {
+      background: rgba(10, 25, 47, 0.7);
+      border-radius: 8px;
+      padding: 5px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn-filter {
+      color: white;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin: 0 5px;
+      border-radius: 5px;
+      padding: 8px 20px;
+      transition: all 0.3s;
+    }
+    
+    .btn-filter:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+    
+    .btn-filter.active {
+      background: rgba(100, 255, 218, 0.2);
+      border-color: rgba(100, 255, 218, 0.5);
+      color: #64ffda;
+      box-shadow: 0 4px 10px rgba(100, 255, 218, 0.2);
+    }
+    
+    .dealer-btn {
+      border-bottom: 3px solid #ff567b !important;
+    }
+    
+    .support-btn {
+      border-bottom: 3px solid #64a1ff !important;
+    }
   </style>
 </head>
 <body>
@@ -631,6 +669,17 @@
     
     <div class="alert alert-info mb-4">
       <strong>안내:</strong> 이 순위표는 별단 길드원만 추가 가능합니다.
+    </div>
+    
+    <!-- 필터 옵션 추가 -->
+    <div class="filter-options mb-4">
+      <div class="d-flex justify-content-center align-items-center flex-wrap">
+        <div class="btn-group filter-group" role="group" aria-label="직업 필터">
+          <button type="button" class="btn btn-filter active" data-filter="all">전체</button>
+          <button type="button" class="btn btn-filter dealer-btn" data-filter="dealer">딜러</button>
+          <button type="button" class="btn btn-filter support-btn" data-filter="support">서포터</button>
+        </div>
+      </div>
     </div>
     
     <!-- 검색 폼 -->
@@ -687,79 +736,85 @@
         <thead class="table-dark">
           <tr>
             <th scope="col" width="7%">순위</th>
-            <th scope="col" width="17%">직업</th>
+            <th scope="col" width="11%">스펙점수</th>
+            <th scope="col" width="13%">직업</th>
             <th scope="col" width="14%">캐릭터</th>
-            <th scope="col" width="13%">아이템 레벨</th>
+            <th scope="col" width="11%">아이템 레벨</th>
             <th scope="col" width="15%">무기</th>
-            <th scope="col" width="19%">아크패시브</th>
+            <th scope="col" width="14%">아크패시브</th>
             <th scope="col" width="15%">각인</th>
           </tr>
         </thead>
         <tbody>
           <% if (characters && characters.length > 0) { %>
             <% characters.forEach((character, index) => { %>
-              <tr class="character-row">
-                <td>
-                  <div class="rank-badge <%= index < 3 ? `rank-${index+1}` : (index < 10 ? 'top-10' : '') %>">
-                    <% if (index === 0) { %><div class="crown"></div><% } %>
-                    <%= index + 1 %>
-                  </div>
-                </td>
-                <td><span class="class-name truncate-text" title="<%= character.className %>"><%= character.className %></span></td>
-                <td><a href="javascript:void(0)" onclick="showDetailPageAlert()" class="character-link" title="<%= character.characterName %>"><%= character.characterName %></a></td>
-                <td class="item-level"><%= character.itemLevel.toFixed(2) %></td>
-                <td>
-                  <% if (character.weapon && character.weapon.level > 0) { %>
-                    <span class="weapon-info">+<%= character.weapon.level %></span><br>
-                    <small class="weapon-quality 
-                    <% if (character.weapon.quality >= 100) { %>quality-100
-                    <% } else if (character.weapon.quality >= 90) { %>quality-90-99
-                    <% } else if (character.weapon.quality >= 70) { %>quality-70-89
-                    <% } else if (character.weapon.quality >= 30) { %>quality-30-69
-                    <% } else if (character.weapon.quality >= 10) { %>quality-10-29
-                    <% } else { %>quality-0-9<% } %>"
-                    title="무기 품질: <%= character.weapon.quality %>%">(<%= character.weapon.quality %>)</small>
-                    
-                  <% } else { %>
-                    -
-                  <% } %>
-                </td>
-                <td>
-                  <% if (character.awakening) { %>
-                    <span class="awakening-passive" title="<%= character.awakening %>"><%= character.awakening %></span>
-                  <% } else { %>
-                    -
-                  <% } %>
-                </td>
-                <td>
-                  <div class="engravings-container">
-                    <% if (character.engravings && character.engravings.length > 0) { %>
-                      <% character.engravings.forEach(eng => { %>
-                        <div class="engraving engraving-relic engraving-level-<%= eng.level %>" title="<%= eng.name %>">
-                          <span class="engraving-name"><%= eng.name.replace(/Lv\. \d+/, '') %> <%= eng.level %></span>
-                          <span class="engraving-info">
-                            <% if (eng.abilityStoneLevel) { %>
-                              <img src="/engrave.png" alt="각인" class="engraving-img">
-                              <span class="ability-stone-level-<%= eng.level %>">Lv. <%= eng.abilityStoneLevel %></span>
-                            <% } %>
-                          </span>
-                        </div>
-                      <% }); %>
+                <tr class="character-row" data-class="<%= character.className %>" data-role="<%= ['바드', '홀리나이트', '도화가'].includes(character.className) ? 'support' : 'dealer' %>" onclick="window.location.href='/rank/character/<%= character.characterName %>'">
+                  <td>
+                    <div class="rank-badge <%= index < 3 ? `rank-${index+1}` : (index < 10 ? 'top-10' : '') %>">
+                      <% if (index === 0) { %><div class="crown"></div><% } %>
+                      <%= index + 1 %>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="spec-score">
+                      <%= character.specScore || 0 %>
+                    </span>
+                  </td>
+                  <td><span class="class-name truncate-text" title="<%= character.className %>"><%= character.className %></span></td>
+                  <td><%= character.characterName %></td>
+                  <td class="item-level"><%= character.itemLevel.toFixed(2) %></td>
+                  <td>
+                    <% if (character.weapon && character.weapon.level > 0) { %>
+                      <span class="weapon-info">+<%= character.weapon.level %></span><br>
+                      <small class="weapon-quality 
+                      <% if (character.weapon.quality >= 100) { %>quality-100
+                      <% } else if (character.weapon.quality >= 90) { %>quality-90-99
+                      <% } else if (character.weapon.quality >= 70) { %>quality-70-89
+                      <% } else if (character.weapon.quality >= 30) { %>quality-30-69
+                      <% } else if (character.weapon.quality >= 10) { %>quality-10-29
+                      <% } else { %>quality-0-9<% } %>"
+                      title="무기 품질: <%= character.weapon.quality %>%">(<%= character.weapon.quality %>)</small>
+                      
+                    <% } else { %>
+                      -
                     <% } %>
-                    
-                    <% if (character.abilityStoneEngravings && character.abilityStoneEngravings.length > 0) { %>
-                      <% character.abilityStoneEngravings.forEach(eng => { %>
-                        <div class="engraving engraving-stone engraving-level-<%= eng.level %>" title="어빌스톤: <%= eng.name %>">
-                          <span class="engraving-name"><%= eng.name %> +<%= eng.level %></span>
-                          <span class="engraving-info">
-                            <img src="/images/engrave.png" alt="각인" class="engraving-img">
-                          </span>
-                        </div>
-                      <% }); %>
+                  </td>
+                  <td>
+                    <% if (character.awakening) { %>
+                      <span class="awakening-passive" title="<%= character.awakening %>"><%= character.awakening %></span>
+                    <% } else { %>
+                      -
                     <% } %>
-                  </div>
-                </td>
-              </tr>
+                  </td>
+                  <td>
+                    <div class="engravings-container">
+                      <% if (character.engravings && character.engravings.length > 0) { %>
+                        <% character.engravings.forEach(eng => { %>
+                          <div class="engraving engraving-relic engraving-level-<%= eng.level %>" title="<%= eng.name %>">
+                            <span class="engraving-name"><%= eng.name.replace(/Lv\. \d+/, '') %> <%= eng.level %></span>
+                            <span class="engraving-info">
+                              <% if (eng.abilityStoneLevel) { %>
+                                <img src="/engrave.png" alt="각인" class="engraving-img">
+                                <span class="ability-stone-level-<%= eng.level %>">Lv. <%= eng.abilityStoneLevel %></span>
+                              <% } %>
+                            </span>
+                          </div>
+                        <% }); %>
+                      <% } %>
+                      
+                      <% if (character.abilityStoneEngravings && character.abilityStoneEngravings.length > 0) { %>
+                        <% character.abilityStoneEngravings.forEach(eng => { %>
+                          <div class="engraving engraving-stone engraving-level-<%= eng.level %>" title="어빌스톤: <%= eng.name %>">
+                            <span class="engraving-name"><%= eng.name %> +<%= eng.level %></span>
+                            <span class="engraving-info">
+                              <img src="/images/engrave.png" alt="각인" class="engraving-img">
+                            </span>
+                          </div>
+                        <% }); %>
+                      <% } %>
+                    </div>
+                  </td>
+                </tr>
             <% }); %>
           <% } else { %>
             <tr>
@@ -1002,6 +1057,99 @@
       if (parts.length === 2) return parts.pop().split(';').shift();
       return null;
     }
+
+    // 캐릭터 상세 페이지 알림 표시
+    function showDetailPageAlert() {
+      const toast = new bootstrap.Toast(document.getElementById('characterDetailToast'));
+      toast.show();
+    }
+    
+    // 도움말 툴팁 표시
+    document.addEventListener('DOMContentLoaded', function() {
+      const helpIcon = document.getElementById('help-icon');
+      const tooltip = document.getElementById('tooltip-text');
+      
+      if (helpIcon && tooltip) {
+        helpIcon.addEventListener('mouseenter', function() {
+          tooltip.style.visibility = 'visible';
+          tooltip.style.opacity = '1';
+        });
+        
+        helpIcon.addEventListener('mouseleave', function() {
+          tooltip.style.visibility = 'hidden';
+          tooltip.style.opacity = '0';
+        });
+      }
+      
+      // 직업 필터링 기능 추가
+      const filterButtons = document.querySelectorAll('.btn-group [data-filter]');
+      const characterRows = document.querySelectorAll('.character-row');
+      
+      filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          // 활성화된 버튼 스타일 변경
+          filterButtons.forEach(btn => btn.classList.remove('active'));
+          this.classList.add('active');
+          
+          const filterValue = this.getAttribute('data-filter');
+          
+          // 캐릭터 행 필터링
+          characterRows.forEach(row => {
+            if (filterValue === 'all') {
+              row.style.display = '';
+            } else {
+              const roleValue = row.getAttribute('data-role');
+              row.style.display = (roleValue === filterValue) ? '' : 'none';
+            }
+          });
+          
+          // 순위 재계산
+          updateRanks();
+        });
+      });
+      
+      // 순위 재계산 함수
+      function updateRanks() {
+        let visibleIndex = 0;
+        
+        characterRows.forEach(row => {
+          if (row.style.display !== 'none') {
+            visibleIndex++;
+            const rankBadge = row.querySelector('.rank-badge');
+            
+            // 순위 표시 업데이트
+            rankBadge.textContent = visibleIndex;
+            
+            // 순위 배지 클래스 업데이트
+            rankBadge.className = 'rank-badge';
+            if (visibleIndex === 1) {
+              rankBadge.classList.add('rank-1');
+              // 왕관 추가
+              if (!rankBadge.querySelector('.crown')) {
+                const crown = document.createElement('div');
+                crown.className = 'crown';
+                rankBadge.appendChild(crown);
+              }
+            } else if (visibleIndex === 2) {
+              rankBadge.classList.add('rank-2');
+              // 왕관 제거
+              const crown = rankBadge.querySelector('.crown');
+              if (crown) rankBadge.removeChild(crown);
+            } else if (visibleIndex === 3) {
+              rankBadge.classList.add('rank-3');
+              // 왕관 제거
+              const crown = rankBadge.querySelector('.crown');
+              if (crown) rankBadge.removeChild(crown);
+            } else if (visibleIndex < 10) {
+              rankBadge.classList.add('top-10');
+              // 왕관 제거
+              const crown = rankBadge.querySelector('.crown');
+              if (crown) rankBadge.removeChild(crown);
+            }
+          }
+        });
+      }
+    });
   </script>
 </body>
 </html>
