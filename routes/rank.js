@@ -369,8 +369,6 @@ async function shouldUpdateCharacter(characterName) {
         }
       }
       
-      console.log(`사용할 시간 컬럼: ${timeColumn}`);
-      
       // 캐릭터 조회
       db.get(`SELECT * FROM characters WHERE characterName = ?`, [characterName], (err, result) => {
         if (err) return reject(err);
@@ -435,6 +433,7 @@ async function fetchAndSaveCharacterData(characterName, apiKey) {
           characterLevel INTEGER,
           guildName TEXT,
           data TEXT,
+          specScore INTEGER DEFAULT 0,
           isGuildMember BOOLEAN DEFAULT 0,
           ${timeColumn} DATETIME DEFAULT CURRENT_TIMESTAMP
         )`, function(err) {
@@ -525,10 +524,11 @@ async function fetchAndSaveCharacterData(characterName, apiKey) {
     
     console.log(`캐릭터 정보: ${characterName}, 서버: ${serverName}, 클래스: ${characterClassName}, 레벨: ${characterLevel}, 아이템 레벨: ${itemLevel}, 길드: ${guildName}`);
     
-    // 길드원이 아닐 경우 데이터 저장하지 않음
-    if (!isGuildMember || profileData.itemLevel < 1640) {
+    // 길드원이 아닐 경우 데이터 저장하지 않음\
+    console.log(toNumber(profileData.ItemAvgLevel));
+    if (!isGuildMember || toNumber(profileData.ItemAvgLevel) < 1640) {
       console.log(`${characterName}는 저장 조건이 아닙니다.`);
-      return { 
+      return {
         success: false, 
         isGuildMember: false, 
         characterName
@@ -2314,5 +2314,21 @@ router.get('/api/refresh-character/:name', async (req, res) => {
       }
     }
   };
+  function toNumber(str, { group = ',', decimal = '.' } = {}) {
+    if (typeof str !== 'string') return NaN;
+  
+    // 1) 부호·공백 정리
+    let s = str.trim().replace(/\u00A0/g, '');    // \u00A0 = NBSP
+    const sign = s.startsWith('(') && s.endsWith(')') ? -1 : 1;
+    s = s.replace(/[()]/g, '');
+  
+    // 2) 구분자 제거 후 표준 “.” 소수점으로 맞추기
+    const reGroup = new RegExp('\\' + group, 'g');   // ex) /,/g
+    s = s.replace(reGroup, '').replace(decimal, '.');
+  
+    // 3) 숫자 변환
+    const n = parseFloat(s);
+    return sign * (isFinite(n) ? n : NaN);
+  }
 
 module.exports = router;
