@@ -1367,13 +1367,13 @@ function transformCharacterData(raw) {
         }
         
         // 엘릭서
-        if (tooltip.Element_009 && tooltip.Element_009.value && typeof tooltip.Element_009.value.Element_000 !== 'undefined' && typeof tooltip.Element_009.value.Element_000 !== 'string') {
-          
-          if(!tooltip.Element_009.value.Element_000.topStr.includes('엘릭서')) {
-            result.transcendLevel = tooltip.Element_009.value.Element_000.topStr.match(/(\d+)\s*단계/)[1];
-            result.transcend = tooltip.Element_009.value.Element_000.topStr.split('단계')[1];
-          }
-        }
+        // if (tooltip.Element_009 && tooltip.Element_009.value && typeof tooltip.Element_009.value.Element_000 !== 'undefined' && typeof tooltip.Element_009.value.Element_000 !== 'string') {
+        //   console.log()
+        //   if(!tooltip.Element_009.value.Element_000.topStr.includes('엘릭서')) {
+        //     result.transcendLevel = tooltip.Element_009.value.Element_000.topStr.match(/(\d+)\s*단계/)[1];
+        //     result.transcend = tooltip.Element_009.value.Element_000.topStr.split('단계')[1];
+        //   }
+        // }
 
         // 품질
         if (tooltip.Element_001 && tooltip.Element_001.value && tooltip.Element_001.value.qualityValue !== undefined) {
